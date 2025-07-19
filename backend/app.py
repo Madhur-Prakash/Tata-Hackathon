@@ -1,8 +1,11 @@
+from datetime import datetime
 import os
+from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 # Handle both relative and absolute imports
 try:
@@ -34,3 +37,31 @@ app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
 @app.get("/")
 async def serve_map():
     return FileResponse(os.path.join(frontend_dir, "map.html"))
+
+class LocationUpdate(BaseModel):
+    lat: float
+    lng: float
+    batteryLevel: float = Field(..., ge=0, le=100)
+    timestamp: Optional[int]  # milliseconds since epoch
+
+class ChargingStation(BaseModel):
+    lat: float
+    lon: float
+    name: str
+
+@app.post("/api/location/update")
+async def update_location(data: LocationUpdate):
+    print(f"Received location update at {datetime.now()}: {data}")
+    
+    # Logic: Redirect if battery < 20%
+    if data.batteryLevel < 20:
+        # Simulated nearby charging station
+        station = ChargingStation(
+            lat=data.lat + 0.005,  # just a nearby point
+            lon=data.lng + 0.005,
+            name="GreenCharge Station - Sector 5"
+        )
+        return {
+            "redirectToChargingStation": True,
+            "station": station
+        }

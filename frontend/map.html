@@ -114,9 +114,11 @@
         <h1>🗺️ OpenStreetMap Interactive Demo</h1>
         
         <div id="map"></div>
+        <div id="routeInfo" style="margin-top:10px; font-weight:bold;"></div>
         
         <div class="controls">
             <input type="text" id="searchInput" placeholder="Search for a location..." />
+            <ul id="suggestions" style="list-style:none; padding-left:0; max-height:150px; overflow-y:auto; border:1px solid #ddd; margin-top:4px; display:none; background:#fff; border-radius:4px;"></ul>
             <button onclick="searchLocation()">Search</button>
             <button onclick="addMarker()">Add Marker</button>
             <button onclick="clearMarkers()">Clear Markers</button>
@@ -158,6 +160,11 @@
         let batteryLevel = 22;
         let watchId = null;
         let isTracking = false;
+        let currentLocation = null;  // store user current location
+        let routeLayer = null;       // layer to show route on map
+        let userMarker = null;
+        const routeInfoDisplay = document.getElementById('routeInfo');
+
         
         const speedDisplay = document.getElementById('speedDisplay');
         const batteryDisplay = document.getElementById('batteryDisplay');
@@ -368,46 +375,176 @@
             return R * c;
         }
 
-        async function searchLocation() {
-            const query = document.getElementById('searchInput').value.trim();
-            if (!query) {
-                updateStatus("Please enter a search query", "error");
-                return;
-            }
+        const suggestionsList = document.getElementById('suggestions');
 
-            try {
-                updateStatus("Searching for location...", "info");
-                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
-                
-                if (!response.ok) {
-                    throw new Error(`Search failed: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                
-                if (data.length > 0) {
-                    const result = data[0];
-                    const lat = parseFloat(result.lat);
-                    const lng = parseFloat(result.lon);
-                    
-                    if (isNaN(lat) || isNaN(lng)) {
-                        throw new Error("Invalid coordinates in search result");
-                    }
-                    
-                    map.setView([lat, lng], 15);
-                    
-                    const marker = L.marker([lat, lng]).addTo(map);
-                    marker.bindPopup(`<b>${result.display_name}</b>`).openPopup();
-                    markers.push(marker);
-                    
-                    updateStatus(`Found: ${result.display_name}`, "success");
-                } else {
-                    updateStatus('Location not found!', "error");
-                }
-            } catch (error) {
-                updateStatus(`Search error: ${error.message}`, "error");
-            }
+function showSearchSuggestions(locations) {
+    suggestionsList.innerHTML = '';
+    locations.forEach((loc, index) => {
+        const li = document.createElement('li');
+        li.style.padding = '8px';
+        li.style.cursor = 'pointer';
+        li.textContent = loc.display_name;
+        li.addEventListener('click', () => {
+            selectSuggestion(loc);
+        });
+        suggestionsList.appendChild(li);
+    });
+    suggestionsList.style.display = 'block';
+}
+
+function clearSuggestions() {
+    suggestionsList.innerHTML = '';
+    suggestionsList.style.display = 'none';
+}
+
+function selectSuggestion(location) {
+    clearSuggestions();
+    const lat = parseFloat(location.lat);
+    const lng = parseFloat(location.lon);
+
+    if (isNaN(lat) || isNaN(lng)) {
+        updateStatus("Invalid coordinates in selected suggestion", "error");
+        return;
+    }
+
+    map.setView([lat, lng], 15);
+
+    // Clear existing route if any
+    if (routeLayer) {
+        map.removeLayer(routeLayer);
+        routeLayer = null;
+    }
+
+    // Show marker at destination
+    const marker = L.marker([lat, lng]).addTo(map);
+    marker.bindPopup(`<b>${location.display_name}</b>`).openPopup();
+    markers.push(marker);
+
+    updateStatus(`Selected location: ${location.display_name}`, "success");
+
+    // Draw route if current location known
+    if (currentLocation) {
+        drawRoute(currentLocation.lat, currentLocation.lng, lat, lng);
+    }
+}
+
+
+
+
+        async function drawRoute(lat1, lon1, lat2, lon2) {
+    updateStatus("Calculating optimized route...", "info");
+
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`;
+
+    try {
+        const res = await fetch(osrmUrl);
+        if (!res.ok) {
+            throw new Error(`Routing API error: ${res.status}`);
         }
+
+        const data = await res.json();
+        if (data.code !== "Ok" || !data.routes || data.routes.length === 0) {
+            throw new Error("No route found");
+        }
+
+        const route = data.routes[0];
+        const coords = route.geometry.coordinates.map(c => [c[1], c[0]]); // flip lon-lat to lat-lon for Leaflet
+
+        // Remove existing route
+        if (routeLayer) {
+            map.removeLayer(routeLayer);
+        }
+
+        routeLayer = L.polyline(coords, { color: 'blue', weight: 5, opacity: 0.7 }).addTo(map);
+
+        // Fit map bounds to route
+        map.fitBounds(routeLayer.getBounds());
+        routeInfoDisplay.textContent = `Distance: ${(route.distance/1000).toFixed(2)} km | Estimated time: ${(route.duration/60).toFixed(1)} min`;
+
+        updateStatus(`Route found: ${(route.distance/1000).toFixed(2)} km, estimated time: ${(route.duration/60).toFixed(1)} min`, "success");
+    } catch (error) {
+        updateStatus(`Error drawing route: ${error.message}`, "error");
+    }
+}
+
+
+function addOrUpdateUserMarker(lat, lng) {
+    if (userMarker) {
+        userMarker.setLatLng([lat, lng]);
+    } else {
+        userMarker = L.marker([lat, lng], {icon: L.icon({
+            iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+            shadowSize: [41, 41]
+        })}).addTo(map).bindPopup('<b>Your Location</b>').openPopup();
+    }
+}
+
+        async function searchLocation() {
+    const query = document.getElementById('searchInput').value.trim();
+    if (!query) {
+        updateStatus("Please enter a search query", "error");
+        return;
+    }
+
+    // If current location unknown, ask for permission first
+    if (!currentLocation) {
+        if (!navigator.geolocation) {
+            updateStatus("Geolocation not supported", "error");
+            return;
+        }
+        updateStatus("Requesting current location permission...", "info");
+        try {
+            currentLocation = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
+            });
+            currentLocation = {
+                lat: currentLocation.coords.latitude,
+                lng: currentLocation.coords.longitude
+            };
+            // Add/update user location marker:
+            addOrUpdateUserMarker(currentLocation.lat, currentLocation.lng);
+            updateStatus(`Current location obtained: ${currentLocation.lat.toFixed(6)}, ${currentLocation.lng.toFixed(6)}`, "success");
+        } catch (error) {
+            updateStatus("Permission denied or error obtaining location", "error");
+            return;
+        }
+    }
+
+    try {
+        updateStatus("Searching for location...", "info");
+
+        // Use Nominatim with India bounding box for priority
+        // India bbox approx: 6.5546,68.1114 (SW) to 35.6745,97.3956 (NE)
+        // Format for viewbox param: left,top,right,bottom = lon1,lat1,lon2,lat2 but Nominatim wants left,top,right,bottom with lat and lon swapped
+        const indiaViewbox = "68.1114,35.6745,97.3956,6.5546"; // left, top, right, bottom in lon,lat
+        // We'll use bounded=1 to restrict results within viewbox and limit=5 for suggestions
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=${indiaViewbox}&bounded=1&limit=5&addressdetails=1`;
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error(`Search failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.length === 0) {
+            updateStatus('Location not found within India!', "error");
+            return;
+        }
+
+        // Show suggestions in a simple dropdown below the search box
+        showSearchSuggestions(data);
+
+    } catch (error) {
+        updateStatus(`Search error: ${error.message}`, "error");
+    }
+}
+
 
         function addMarker() {
             try {
@@ -434,40 +571,43 @@
         }
 
         function getCurrentLocation() {
-            if (!navigator.geolocation) {
-                updateStatus('Geolocation is not supported by this browser', "error");
-                return;
-            }
+    if (!navigator.geolocation) {
+        updateStatus('Geolocation is not supported by this browser', "error");
+        return;
+    }
 
-            updateStatus("Getting current location...", "info");
-            
-            navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    try {
-                        const lat = position.coords.latitude;
-                        const lng = position.coords.longitude;
-                        
-                        if (isNaN(lat) || isNaN(lng)) {
-                            throw new Error("Invalid coordinates received");
-                        }
-                        
-                        map.setView([lat, lng], 15);
-                        
-                        const marker = L.marker([lat, lng]).addTo(map);
-                        marker.bindPopup('<b>Your Location</b>').openPopup();
-                        markers.push(marker);
-                        
-                        updateStatus(`Current location: ${lat.toFixed(6)}, ${lng.toFixed(6)}`, "success");
-                    } catch (error) {
-                        updateStatus(`Error processing location: ${error.message}`, "error");
-                    }
-                },
-                function(error) {
-                    handleLocationError(error);
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
-            );
-        }
+    updateStatus("Getting current location...", "info");
+
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            try {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+
+                if (isNaN(lat) || isNaN(lng)) {
+                    throw new Error("Invalid coordinates received");
+                }
+
+                currentLocation = { lat, lng };
+                addOrUpdateUserMarker(lat, lng);
+
+                map.setView([lat, lng], 15);
+
+                const marker = L.marker([lat, lng]).addTo(map);
+                marker.bindPopup('<b>Your Location</b>').openPopup();
+                markers.push(marker);
+
+                updateStatus(`Current location: ${lat.toFixed(6)}, ${lng.toFixed(6)}`, "success");
+            } catch (error) {
+                updateStatus(`Error processing location: ${error.message}`, "error");
+            }
+        },
+        function(error) {
+            handleLocationError(error);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+}
 
         // Allow Enter key for search
         document.getElementById('searchInput').addEventListener('keypress', function(e) {
