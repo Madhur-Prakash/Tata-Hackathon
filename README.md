@@ -57,7 +57,7 @@ Make sure you have Python 3.8+ installed on your system.
 2. **Start Backend Server**:
    ```bash
    cd backend
-   python main.py
+   uvicorn app:app --reload 
    ```
 
 3. **Start Frontend Application** (in a new terminal):
@@ -134,7 +134,7 @@ Make sure you have Python 3.8+ installed on your system.
 To run in debug mode with more detailed logs:
 ```bash
 cd backend
-uvicorn app:app --reload 
+uvicorn app:app --host 127.0.0.1 --port 8000 --reload --log-level debug
 ```
 
 ## 📝 Development
