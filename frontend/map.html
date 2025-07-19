@@ -7,8 +7,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         html, body { height: 100%; margin: 0; padding: 0; }
-        #map { height: 100%; width: 100%; }
-
+        
         body {
             margin: 0;
             padding: 20px;
@@ -43,6 +42,7 @@
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
+            align-items: center;
         }
         
         button {
@@ -59,12 +59,24 @@
             background: #005a87;
         }
         
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
         input[type="text"] {
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
             flex: 1;
             min-width: 200px;
+        }
+        
+        input[type="number"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 150px;
         }
         
         .info {
@@ -74,49 +86,30 @@
             border-radius: 5px;
             border-left: 4px solid #007cba;
         }
+        
+        .status {
+            margin-top: 10px;
+            padding: 8px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .error {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+            color: #c62828;
+        }
+        
+        .success {
+            background: #e8f5e8;
+            border-left: 4px solid #4caf50;
+            color: #2e7d32;
+        }
     </style>
 </head>
 <body>
-    <script>
-    function loadLeaflet(callback) {
-        const script = document.createElement('script');
-        script.src = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js";
-        script.onload = callback;
-        document.head.appendChild(script);
-    }
-
-    window.onload = function () {
-        loadLeaflet(function () {
-            initMap(); // Now Leaflet (L) is guaranteed to be defined
-        });
-    };
-</script>
-
-<script>
-let map; // Declare globally
-
-function initMap() {
-    map = L.map('map').setView([51.505, -0.09], 13); // Assign inside function
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    
-        // Add click event to map
-        map.on('click', function(e) {
-            const lat = e.latlng.lat;
-            const lng = e.latlng.lng;
-            
-            const marker = L.marker([lat, lng]).addTo(map);
-            marker.bindPopup(`<b>Coordinates:</b><br>Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}`);
-            markers.push(marker);
-        });
-
-}
-
-</script>
-
-    
     <div class="container">
         <h1>🗺️ OpenStreetMap Interactive Demo</h1>
         
@@ -128,61 +121,164 @@ function initMap() {
             <button onclick="addMarker()">Add Marker</button>
             <button onclick="clearMarkers()">Clear Markers</button>
             <button onclick="getCurrentLocation()">My Location</button>
+            <input type="number" id="batteryInput" placeholder="Battery level (%)" min="0" max="100" />
+            <button onclick="updateBatteryLevel()">Set Battery</button>
+            <button id="trackingBtn" onclick="toggleTracking()">Start Tracking</button>
         </div>
         
         <div class="info">
             <strong>Features:</strong> Click on the map to add markers, use the search to find locations, 
             or click "My Location" to center on your position. You can zoom and pan around the map freely.
+            <div id="speedDisplay" style="margin-top: 10px; font-weight: bold;"></div>
+            <div id="batteryDisplay" style="margin-top: 5px; font-weight: bold;">🔋 Battery: 22%</div>
         </div>
+        
+        <div id="statusDisplay" class="status"></div>
     </div>
-    <input type="number" id="batteryInput" placeholder="Battery level (%)" min="0" max="100" style="width: 150px;" />
-<button onclick="updateBatteryLevel()">Set Battery</button>
-<div class="controls">
-    <input type="text" id="searchInput" placeholder="Search for a location..." />
-    <button onclick="searchLocation()">Search</button>
-    <button onclick="addMarker()">Add Marker</button>
-    <button onclick="clearMarkers()">Clear Markers</button>
-    <button onclick="getCurrentLocation()">My Location</button>
-    <input type="number" id="batteryInput" placeholder="Battery level (%)" min="0" max="100" style="width: 150px;" />
-    <button onclick="updateBatteryLevel()">Set Battery</button>
-</div>
-
-
 
     <script>
+        function loadLeaflet(callback) {
+            const script = document.createElement('script');
+            script.src = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js";
+            script.onload = callback;
+            document.head.appendChild(script);
+        }
+
+        window.onload = function () {
+            loadLeaflet(function () {
+                initMap();
+            });
+        };
+    </script>
+
+    <script>
+        let map;
+        let markers = [];
+        let lastPosition = null;
+        let batteryLevel = 22;
+        let watchId = null;
+        let isTracking = false;
+        
+        const speedDisplay = document.getElementById('speedDisplay');
+        const batteryDisplay = document.getElementById('batteryDisplay');
+        const statusDisplay = document.getElementById('statusDisplay');
+        const trackingBtn = document.getElementById('trackingBtn');
+
+        function initMap() {
+            try {
+                map = L.map('map').setView([51.505, -0.09], 13);
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(map);
+
+                // Add click event to map
+                map.on('click', function(e) {
+                    const lat = e.latlng.lat;
+                    const lng = e.latlng.lng;
+                    
+                    const marker = L.marker([lat, lng]).addTo(map);
+                    marker.bindPopup(`<b>Coordinates:</b><br>Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}`);
+                    markers.push(marker);
+                });
+                
+                updateStatus("Map initialized successfully", "success");
+            } catch (error) {
+                updateStatus(`Map initialization error: ${error.message}`, "error");
+            }
+        }
+
+        function updateStatus(message, type = "info") {
+            const timestamp = new Date().toLocaleTimeString();
+            statusDisplay.textContent = `[${timestamp}] ${message}`;
+            statusDisplay.className = `status ${type}`;
+            console.log(message);
+        }
+
         function updateBatteryLevel() {
-    const input = document.getElementById('batteryInput').value;
-    const value = parseInt(input);
+            const input = document.getElementById('batteryInput').value;
+            const value = parseInt(input);
 
-    if (!isNaN(value) && value >= 0 && value <= 100) {
-        batteryLevel = value;
-        alert(`🔋 Battery level set to ${batteryLevel}%`);
-    } else {
-        alert('Please enter a valid battery level between 0 and 100.');
-    }
-}
+            if (!isNaN(value) && value >= 0 && value <= 100) {
+                batteryLevel = value;
+                batteryDisplay.textContent = `🔋 Battery: ${batteryLevel}%`;
+                updateStatus(`Battery level set to ${batteryLevel}%`, "success");
+            } else {
+                updateStatus('Please enter a valid battery level between 0 and 100.', "error");
+            }
+        }
 
-    let lastPosition = null;
-    const speedDisplay = document.createElement('div');
-    speedDisplay.style.marginTop = '10px';
-    speedDisplay.style.fontWeight = 'bold';
-    document.querySelector('.info').appendChild(speedDisplay);
+        function toggleTracking() {
+            if (isTracking) {
+                stopTracking();
+            } else {
+                startTracking();
+            }
+        }
 
-    // Simulate or collect battery level (in real use, get from OBD or input)
-    let batteryLevel = 22; // Sample low battery
+        function startTracking() {
+            if (!navigator.geolocation) {
+                updateStatus("Geolocation is not supported by this browser", "error");
+                return;
+            }
 
-    function startTracking() {
-        if (navigator.geolocation) {
-            navigator.geolocation.watchPosition(async function(position) {
-                const { latitude: lat, longitude: lng } = position.coords;
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 1000
+            };
 
-                // Calculate speed
-                if (lastPosition) {
+            updateStatus("Starting location tracking...", "info");
+            
+            watchId = navigator.geolocation.watchPosition(
+                handleLocationSuccess,
+                handleLocationError,
+                options
+            );
+            
+            isTracking = true;
+            trackingBtn.textContent = "Stop Tracking";
+            trackingBtn.style.background = "#f44336";
+        }
+
+        function stopTracking() {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            isTracking = false;
+            trackingBtn.textContent = "Start Tracking";
+            trackingBtn.style.background = "#007cba";
+            updateStatus("Location tracking stopped", "info");
+        }
+
+        async function handleLocationSuccess(position) {
+            try {
+                // Validate position data
+                if (!position || !position.coords) {
+                    throw new Error("Invalid position data received");
+                }
+
+                const { latitude: lat, longitude: lng, accuracy } = position.coords;
+                
+                // Validate coordinates
+                if (typeof lat !== 'number' || typeof lng !== 'number' || 
+                    isNaN(lat) || isNaN(lng) || 
+                    lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                    throw new Error(`Invalid coordinates: lat=${lat}, lng=${lng}`);
+                }
+
+                updateStatus(`Location: ${lat.toFixed(6)}, ${lng.toFixed(6)} (±${accuracy?.toFixed(0)}m)`, "success");
+
+                // Calculate speed if we have a previous position
+                if (lastPosition && lastPosition.timestamp) {
                     const dist = haversine(lastPosition.lat, lastPosition.lng, lat, lng);
-                    const timeDiff = (position.timestamp - lastPosition.timestamp) / 1000; // seconds
-                    const speedMps = dist / timeDiff;
-                    const speedKmph = speedMps * 3.6;
-                    speedDisplay.textContent = `🚗 Current Speed: ${speedKmph.toFixed(2)} km/h`;
+                    const timeDiff = (position.timestamp - lastPosition.timestamp) / 1000;
+                    
+                    if (timeDiff > 0) {
+                        const speedMps = dist / timeDiff;
+                        const speedKmph = speedMps * 3.6;
+                        speedDisplay.textContent = `🚗 Speed: ${speedKmph.toFixed(2)} km/h`;
+                    }
                 }
 
                 lastPosition = {
@@ -191,64 +287,102 @@ function initMap() {
                     timestamp: position.timestamp
                 };
 
-                // Send battery level and location to backend - FIXED URL
-                try {
-                    const response = await fetch('http://localhost:8000/api/location/update', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            lat,
-                            lng,
-                            batteryLevel
-                        })
-                    });
+                // Send to backend (if available)
+                await sendLocationUpdate(lat, lng);
 
-                    const data = await response.json();
-                    if (data.redirectToChargingStation && data.station) {
-                        const { lat: clat, lon: clon, name } = data.station;
+            } catch (error) {
+                updateStatus(`Location processing error: ${error.message}`, "error");
+            }
+        }
+
+        function handleLocationError(error) {
+            let message = "Location error: ";
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    message += "Permission denied by user";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message += "Position unavailable";
+                    break;
+                case error.TIMEOUT:
+                    message += "Location request timed out";
+                    break;
+                default:
+                    message += error.message || "Unknown error";
+                    break;
+            }
+            updateStatus(message, "error");
+        }
+
+        async function sendLocationUpdate(lat, lng) {
+            try {
+                const response = await fetch('http://localhost:8000/api/location/update', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        lat,
+                        lng,
+                        batteryLevel,
+                        timestamp: Date.now()
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.redirectToChargingStation && data.station) {
+                    const { lat: clat, lon: clon, name } = data.station;
+                    
+                    if (typeof clat === 'number' && typeof clon === 'number' && 
+                        !isNaN(clat) && !isNaN(clon)) {
                         map.setView([clat, clon], 15);
                         const marker = L.marker([clat, clon]).addTo(map);
                         marker.bindPopup(`<b>🔋 Nearest Charging Station</b><br>${name}`).openPopup();
                         markers.push(marker);
+                        updateStatus(`Redirected to charging station: ${name}`, "success");
+                    } else {
+                        updateStatus("Invalid charging station coordinates received", "error");
                     }
-                } catch (error) {
-                    console.error('Error updating location:', error);
                 }
-
-            }, function(err) {
-                alert('Failed to track location: ' + err.message);
-            }, { enableHighAccuracy: true, maximumAge: 1000 });
-        } else {
-            alert("Geolocation not supported.");
+            } catch (error) {
+                // Don't spam the status with backend errors, just log them
+                console.warn('Backend communication error:', error.message);
+            }
         }
-    }
 
-    // Call it on load
-    startTracking();
+        function haversine(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // Earth's radius in meters
+            const toRad = (deg) => deg * Math.PI / 180;
 
-    // Haversine formula
-    function haversine(lat1, lon1, lat2, lon2) {
-        const R = 6371000; // meters
-        const toRad = (deg) => deg * Math.PI / 180;
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+            const a = Math.sin(dLat/2)**2 + 
+                     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
 
-        const dLat = toRad(lat2 - lat1);
-        const dLon = toRad(lon2 - lon1);
-        const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c; // in meters
-    }
-
-      
-        // Store markers
-        let markers = [];
-
-        // Search for location
         async function searchLocation() {
-            const query = document.getElementById('searchInput').value;
-            if (!query) return;
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) {
+                updateStatus("Please enter a search query", "error");
+                return;
+            }
 
             try {
+                updateStatus("Searching for location...", "info");
                 const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Search failed: ${response.status}`);
+                }
+                
                 const data = await response.json();
                 
                 if (data.length > 0) {
@@ -256,53 +390,83 @@ function initMap() {
                     const lat = parseFloat(result.lat);
                     const lng = parseFloat(result.lon);
                     
+                    if (isNaN(lat) || isNaN(lng)) {
+                        throw new Error("Invalid coordinates in search result");
+                    }
+                    
                     map.setView([lat, lng], 15);
                     
                     const marker = L.marker([lat, lng]).addTo(map);
                     marker.bindPopup(`<b>${result.display_name}</b>`).openPopup();
                     markers.push(marker);
+                    
+                    updateStatus(`Found: ${result.display_name}`, "success");
                 } else {
-                    alert('Location not found!');
+                    updateStatus('Location not found!', "error");
                 }
             } catch (error) {
-                alert('Error searching location: ' + error.message);
+                updateStatus(`Search error: ${error.message}`, "error");
             }
         }
 
-        // Add marker at map center
         function addMarker() {
-            const center = map.getCenter();
-            const marker = L.marker([center.lat, center.lng]).addTo(map);
-            marker.bindPopup(`<b>Manual Marker</b><br>Lat: ${center.lat.toFixed(5)}<br>Lng: ${center.lng.toFixed(5)}`);
-            markers.push(marker);
-        }
-
-        // Clear all markers
-        function clearMarkers() {
-            markers.forEach(marker => {
-                map.removeLayer(marker);
-            });
-            markers = [];
-        }
-
-        // Get current location
-        function getCurrentLocation() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(function(position) {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    
-                    map.setView([lat, lng], 15);
-                    
-                    const marker = L.marker([lat, lng]).addTo(map);
-                    marker.bindPopup('<b>Your Location</b>').openPopup();
-                    markers.push(marker);
-                }, function() {
-                    alert('Unable to get your location');
-                });
-            } else {
-                alert('Geolocation is not supported by this browser');
+            try {
+                const center = map.getCenter();
+                const marker = L.marker([center.lat, center.lng]).addTo(map);
+                marker.bindPopup(`<b>Manual Marker</b><br>Lat: ${center.lat.toFixed(5)}<br>Lng: ${center.lng.toFixed(5)}`);
+                markers.push(marker);
+                updateStatus("Marker added at map center", "success");
+            } catch (error) {
+                updateStatus(`Error adding marker: ${error.message}`, "error");
             }
+        }
+
+        function clearMarkers() {
+            try {
+                markers.forEach(marker => {
+                    map.removeLayer(marker);
+                });
+                markers = [];
+                updateStatus(`Cleared ${markers.length} markers`, "success");
+            } catch (error) {
+                updateStatus(`Error clearing markers: ${error.message}`, "error");
+            }
+        }
+
+        function getCurrentLocation() {
+            if (!navigator.geolocation) {
+                updateStatus('Geolocation is not supported by this browser', "error");
+                return;
+            }
+
+            updateStatus("Getting current location...", "info");
+            
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    try {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        
+                        if (isNaN(lat) || isNaN(lng)) {
+                            throw new Error("Invalid coordinates received");
+                        }
+                        
+                        map.setView([lat, lng], 15);
+                        
+                        const marker = L.marker([lat, lng]).addTo(map);
+                        marker.bindPopup('<b>Your Location</b>').openPopup();
+                        markers.push(marker);
+                        
+                        updateStatus(`Current location: ${lat.toFixed(6)}, ${lng.toFixed(6)}`, "success");
+                    } catch (error) {
+                        updateStatus(`Error processing location: ${error.message}`, "error");
+                    }
+                },
+                function(error) {
+                    handleLocationError(error);
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
         }
 
         // Allow Enter key for search
@@ -311,6 +475,9 @@ function initMap() {
                 searchLocation();
             }
         });
+
+        // Initialize battery display
+        batteryDisplay.textContent = `🔋 Battery: ${batteryLevel}%`;
     </script>
 </body>
 </html>
