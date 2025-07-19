@@ -28,7 +28,7 @@ Make sure you have Python 3.8+ installed on your system.
 
 1. **Install Dependencies**:
    ```bash
-   cd project-root/backend
+   cd backend
    pip install -r requirements.txt
    ```
 
@@ -38,13 +38,11 @@ Make sure you have Python 3.8+ installed on your system.
 
 1. **Start Backend Server**:
    ```bash
-   cd project-root
    python start_backend.py
    ```
 
 2. **Start Frontend Application** (in a new terminal):
    ```bash
-   cd project-root
    python start_frontend.py
    ```
 
@@ -52,19 +50,19 @@ Make sure you have Python 3.8+ installed on your system.
 
 1. **Initialize Database**:
    ```bash
-   cd project-root/backend
+   cd backend
    python init_db.py
    ```
 
 2. **Start Backend Server**:
    ```bash
-   cd project-root/backend
+   cd backend
    python main.py
    ```
 
 3. **Start Frontend Application** (in a new terminal):
    ```bash
-   cd project-root/frontend
+   cd frontend
    python main.py
    ```
 
@@ -135,27 +133,41 @@ Make sure you have Python 3.8+ installed on your system.
 
 To run in debug mode with more detailed logs:
 ```bash
-cd project-root/backend
-uvicorn app:app --host 127.0.0.1 --port 8000 --reload --log-level debug
+cd backend
+uvicorn app:app --reload 
 ```
 
 ## 📝 Development
 
 ### Project Structure
 ```
-project-root/
-├── backend/
-│   ├── routes/           # API route handlers
-│   ├── services/         # Business logic
-│   ├── app.py           # FastAPI application
-│   ├── models.py        # Data models
-│   ├── database.py      # Database configuration
-│   └── main.py          # Server entry point
-├── frontend/
-│   ├── main.py          # PyQt application
-│   └── map.html         # Web interface
-├── start_backend.py     # Backend startup script
-└── start_frontend.py    # Frontend startup script
+Tata hackathon/
+├── .gitignore  # gitignore file for GitHub
+├── README.md  # Project documentation
+├── backend
+│   ├── __init__.py  # initializes package
+│   ├── app.py  # main FastAPI app
+│   ├── database.py  # database configuration
+│   ├── init_db.py
+│   ├── main.py
+│   ├── mapapp.db
+│   ├── models.py  # models
+│   ├── requirements.txt
+│   ├── routes
+│   │   ├── __init__.py  # initializes package
+│   │   ├── charging.py
+│   │   ├── location.py
+│   │   └── route.py
+│   └── services
+│       ├── __init__.py  # initializes package
+│       ├── charging_service.py
+│       └── routing_service.py
+├── frontend
+│   ├── main.py
+│   ├── map.html
+│   └── map_new.html
+├── start_backend.py
+├── start_frontend.py
 ```
 
 ### Adding New Features
