@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart EV Charging Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha512-p5n+Gc7WlxdL6xzUReTMEoQxY5kI2VJt9pjpRBwN6oC9+t5Ix4RlN+x3m9Sgjvhvmj1bvw6PBoflt+kSgZp4Kw==" crossorigin=""/>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .header h1 {
+            margin: 0;
+            color: #333;
+            text-align: center;
+            font-size: 2.5em;
+            font-weight: 300;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .container {
+            position: relative;
+            height: calc(100vh - 100px);
+            margin: 0;
+        }
+        
+        #map {
+            height: 100%;
+            width: 100%;
+            border-radius: 0;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 300px;
+        }
+        
+        .control-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+        
+        .control-group h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            margin-bottom: 8px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid rgba(102, 126, 234, 0.2);
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
+            margin-bottom: 8px;
+            box-sizing: border-box;
+        }
+        
+        input[type="text"]:focus, input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .battery-display {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        .battery-low {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+        }
+        
+        .battery-critical {
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+            box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 500;
+            z-index: 1001;
+            max-width: 350px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+        
+        .status.show {
+            transform: translateX(0);
+        }
+        
+        .status.success {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+        }
+        
+        .status.error {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+        }
+        
+        .status.warning {
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+        }
+        
+        .status.info {
+            background: linear-gradient(135deg, #2196F3, #1976D2);
+        }
+        
+        .leaflet-popup-content-wrapper {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+        
+        .charging-station {
+            text-align: center;
+            padding: 10px;
+        }
+        
+        .charging-station h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        
+        .station-info {
+            font-size: 12px;
+            color: #666;
+            margin: 5px 0;
+        }
+        
+        .fallback-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            max-width: 400px;
+        }
+        
+        @media (max-width: 768px) {
+            .controls {
+                position: relative;
+                top: 0;
+                right: 0;
+                max-width: none;
+                margin: 20px;
+            }
+            
+            .container {
+                height: auto;
+                min-height: 500px;
+            }
+            
+            #map {
+                height: 500px;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚗⚡ Smart EV Charging Map</h1>
+    </div>
+    
+    <div class="container">
+        <div id="map"></div>
+        <div id="fallback" class="fallback-message" style="display: none;">
+            <h3>🗺️ Map Loading...</h3>
+            <p>If the map doesn't load, you may be offline or experiencing connectivity issues.</p>
+            <button onclick="retryMapLoad()">🔄 Retry</button>
+            <button onclick="showDemoMode()">📱 Demo Mode</button>
+        </div>
+        
+        <div class="controls">
+            <div class="control-panel">
+                <div class="control-group">
+                    <div id="batteryDisplay" class="battery-display">🔋 Battery: 75%</div>
+                </div>
+                
+                <div class="control-group">
+                    <h4>🔍 Search</h4>
+                    <input type="text" id="searchInput" placeholder="Search location..." />
+                    <button onclick="searchLocation()">🔍 Search</button>
+                </div>
+                
+                <div class="control-group">
+                    <h4>📍 Location</h4>
+                    <button onclick="getCurrentLocation()">📍 My Location</button>
+                    <button onclick="addMarker()">📌 Add Marker</button>
+                </div>
+                
+                <div class="control-group">
+                    <h4>🔋 Battery</h4>
+                    <input type="number" id="batteryInput" placeholder="Battery %" min="0" max="100" />
+                    <button onclick="updateBattery()">⚡ Update</button>
+                </div>
+                
+                <div class="control-group">
+                    <h4>⚡ Charging</h4>
+                    <button onclick="findChargingStations()">🔍 Find Stations</button>
+                    <button onclick="simulateRoute()">🗺️ Plan Route</button>
+                </div>
+                
+                <div class="control-group">
+                    <button onclick="clearMap()">🗑️ Clear Map</button>
+                    <button onclick="resetDemo()">🔄 Reset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="status" class="status"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha512-o8ZvkwYux8JmD9eV7ay/owEjlfX9rV3E1jV0+Nuw4Q1QmHzWl93dK3x2LRHzfGe3F9oCmFdlkQoD2U6mOK6+2w==" crossorigin=""></script>
+
+    <script>
+        let map;
+        let batteryLevel = 75;
+        let userLocation = null;
+        let markers = [];
+        let routeLayer = null;
+        
+        // Sample charging stations data
+        const chargingStations = [
+            { name: "Tesla Supercharger", lat: 40.7505, lng: -73.9934, type: "fast", power: "250kW", available: 8 },
+            { name: "ChargePoint Station", lat: 40.6782, lng: -73.9442, type: "level2", power: "22kW", available: 3 },
+            { name: "EVgo Fast Charging", lat: 40.7282, lng: -73.7949, type: "fast", power: "150kW", available: 5 },
+            { name: "Electrify America", lat: 40.7831, lng: -73.9712, type: "fast", power: "350kW", available: 12 },
+            { name: "Public Level 2", lat: 40.7128, lng: -74.0060, type: "level2", power: "11kW", available: 2 }
+        ];
+        
+        function initMap() {
+            try {
+                // Check if Leaflet loaded successfully
+                if (typeof L === 'undefined') {
+                    throw new Error('Leaflet library failed to load');
+                }
+                
+                // Initialize map
+                map = L.map('map').setView([40.7128, -74.0060], 12);
+                
+                // Add tile layer with fallback
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors',
+                    maxZoom: 19
+                }).addTo(map);
+                
+                // Hide fallback message
+                document.getElementById('fallback').style.display = 'none';
+                
+                // Add some initial charging stations
+                addChargingStationsToMap();
+                
+                showStatus('🗺️ Map loaded successfully!', 'success');
+                
+                // Try to get user location
+                getCurrentLocation();
+                
+            } catch (error) {
+                console.error('Map initialization error:', error);
+                showFallbackMode();
+            }
+        }
+        
+        function showFallbackMode() {
+            document.getElementById('fallback').style.display = 'block';
+            showStatus('⚠️ Map failed to load. Check your internet connection.', 'error');
+        }
+        
+        function retryMapLoad() {
+            document.getElementById('fallback').style.display = 'none';
+            setTimeout(initMap, 1000);
+        }
+        
+        function showDemoMode() {
+            // Convert to demo mode similar to your offline HTML
+            document.getElementById('map').innerHTML = `
+                <div style="height: 100%; display: flex; align-items: center; justify-content: center; background: #e8f4f8; flex-direction: column;">
+                    <h3>📍 Demo Mode</h3>
+                    <p>Simulated location: New York City</p>
+                    <p>Battery: <span id="demoBattery">75%</span></p>
+                    <p>Coordinates: 40.7128, -74.0060</p>
+                    <button onclick="simulateMovement()" style="margin-top: 15px;">🚗 Simulate Drive</button>
+                </div>
+            `;
+            document.getElementById('fallback').style.display = 'none';
+            showStatus('📱 Running in demo mode', 'info');
+        }
+        
+        function addChargingStationsToMap() {
+            if (!map) return;
+            
+            chargingStations.forEach(station => {
+                const icon = station.type === 'fast' ? '⚡' : '🔌';
+                const color = station.type === 'fast' ? 'red' : 'blue';
+                
+                const marker = L.marker([station.lat, station.lng], {
+                    icon: L.divIcon({
+                        html: `<div style="background: ${color}; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; color: white; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${icon}</div>`,
+                        iconSize: [30, 30],
+                        className: 'custom-div-icon'
+                    })
+                }).addTo(map);
+                
+                marker.bindPopup(`
+                    <div class="charging-station">
+                        <h4>${icon} ${station.name}</h4>
+                        <div class="station-info">⚡ Power: ${station.power}</div>
+                        <div class="station-info">🔌 Available: ${station.available} ports</div>
+                        <div class="station-info">📍 Type: ${station.type.toUpperCase()}</div>
+                        <button onclick="routeToStation(${station.lat}, ${station.lng}, '${station.name}')" style="margin-top: 10px; padding: 8px 16px;">🗺️ Route Here</button>
+                    </div>
+                `);
+                
+                markers.push(marker);
+            });
+        }
+        
+        function getCurrentLocation() {
+            if (navigator.geolocation) {
+                showStatus('📍 Getting your location...', 'info');
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        userLocation = [lat, lng];
+                        
+                        if (map) {
+                            map.setView([lat, lng], 14);
+                            
+                            // Add user location marker
+                            const userMarker = L.marker([lat, lng], {
+                                icon: L.divIcon({
+                                    html: '<div style="background: #4CAF50; border-radius: 50%; width: 20px; height: 20px; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>',
+                                    iconSize: [20, 20],
+                                    className: 'user-location-icon'
+                                })
+                            }).addTo(map);
+                            
+                            userMarker.bindPopup('📍 You are here!');
+                            markers.push(userMarker);
+                        }
+                        
+                        showStatus('📍 Location found!', 'success');
+                    },
+                    (error) => {
+                        showStatus('❌ Could not get location. Using default.', 'warning');
+                        console.error('Geolocation error:', error);
+                    }
+                );
+            } else {
+                showStatus('❌ Geolocation not supported by this browser.', 'error');
+            }
+        }
+        
+        function searchLocation() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) {
+                showStatus('❌ Please enter a location to search.', 'error');
+                return;
+            }
+            
+            showStatus('🔍 Searching for location...', 'info');
+            
+            // Simple geocoding simulation (in a real app, you'd use a geocoding service)
+            const locations = {
+                'new york': [40.7128, -74.0060],
+                'los angeles': [34.0522, -118.2437],
+                'chicago': [41.8781, -87.6298],
+                'miami': [25.7617, -80.1918],
+                'seattle': [47.6062, -122.3321],
+                'san francisco': [37.7749, -122.4194],
+                'boston': [42.3601, -71.0589],
+                'washington dc': [38.9072, -77.0369]
+            };
+            
+            const searchKey = query.toLowerCase();
+            const found = Object.keys(locations).find(key => searchKey.includes(key) || key.includes(searchKey));
+            
+            if (found) {
+                const coords = locations[found];
+                if (map) {
+                    map.setView(coords, 13);
+                    addMarker(coords[0], coords[1], `🔍 ${query}`);
+                }
+                showStatus(`📍 Found: ${found}`, 'success');
+            } else {
+                showStatus('❌ Location not found. Try: New York, Los Angeles, Chicago, etc.', 'error');
+            }
+        }
+        
+        function addMarker(lat = null, lng = null, label = '📌 Custom Marker') {
+            if (!map) {
+                showStatus('❌ Map not available', 'error');
+                return;
+            }
+            
+            const coords = lat && lng ? [lat, lng] : map.getCenter();
+            
+            const marker = L.marker(coords, {
+                icon: L.divIcon({
+                    html: '<div style="background: #2196F3; border-radius: 50%; width: 25px; height: 25px; display: flex; align-items: center; justify-content: center; color: white; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">📌</div>',
+                    iconSize: [25, 25],
+                    className: 'custom-marker-icon'
+                })
+            }).addTo(map);
+            
+            marker.bindPopup(label);
+            markers.push(marker);
+            showStatus('📌 Marker added!', 'success');
+        }
+        
+        function updateBattery() {
+            const input = document.getElementById('batteryInput');
+            const value = parseInt(input.value);
+            
+            if (isNaN(value) || value < 0 || value > 100) {
+                showStatus('❌ Please enter a valid battery level (0-100)', 'error');
+                return;
+            }
+            
+            batteryLevel = value;
+            updateBatteryDisplay();
+            input.value = '';
+            showStatus(`🔋 Battery updated to ${batteryLevel}%`, 'success');
+        }
+        
+        function updateBatteryDisplay() {
+            const display = document.getElementById('batteryDisplay');
+            display.textContent = `🔋 Battery: ${batteryLevel}%`;
+            
+            // Update styling based on battery level
+            display.className = 'battery-display';
+            if (batteryLevel < 20) {
+                display.classList.add('battery-critical');
+            } else if (batteryLevel < 40) {
+                display.classList.add('battery-low');
+            }
+        }
+        
+        function findChargingStations() {
+            if (!map) {
+                showStatus('❌ Map not available', 'error');
+                return;
+            }
+            
+            showStatus('🔍 Finding nearby charging stations...', 'info');
+            
+            // Highlight existing charging stations
+            setTimeout(() => {
+                markers.forEach(marker => {
+                    if (marker.options.icon && marker.options.icon.options.html.includes('⚡')) {
+                        marker.openPopup();
+                        setTimeout(() => marker.closePopup(), 2000);
+                    }
+                });
+                showStatus(`⚡ Found ${chargingStations.length} charging stations nearby!`, 'success');
+            }, 1000);
+        }
+        
+        function simulateRoute() {
+            if (!map) {
+                showStatus('❌ Map not available', 'error');
+                return;
+            }
+            
+            const center = map.getCenter();
+            const destination = [
+                center.lat + (Math.random() - 0.5) * 0.02,
+                center.lng + (Math.random() - 0.5) * 0.02
+            ];
+            
+            // Clear existing route
+            if (routeLayer) {
+                map.removeLayer(routeLayer);
+            }
+            
+            // Create a simple route line
+            routeLayer = L.polyline([
+                [center.lat, center.lng],
+                destination
+            ], {
+                color: '#4CAF50',
+                weight: 4,
+                opacity: 0.8
+            }).addTo(map);
+            
+            // Add destination marker
+            addMarker(destination[0], destination[1], '🎯 Destination');
+            
+            const distance = Math.round(center.distanceTo(destination) / 1000 * 10) / 10;
+            showStatus(`🗺️ Route planned: ${distance} km`, 'success');
+        }
+        
+        function routeToStation(lat, lng, name) {
+            if (!map) return;
+            
+            const center = map.getCenter();
+            
+            // Clear existing route
+            if (routeLayer) {
+                map.removeLayer(routeLayer);
+            }
+            
+            // Create route to station
+            routeLayer = L.polyline([
+                [center.lat, center.lng],
+                [lat, lng]
+            ], {
+                color: '#f44336',
+                weight: 4,
+                opacity: 0.8,
+                dashArray: '10, 5'
+            }).addTo(map);
+            
+            const distance = Math.round(center.distanceTo([lat, lng]) / 1000 * 10) / 10;
+            showStatus(`🗺️ Route to ${name}: ${distance} km`, 'success');
+        }
+        
+        function clearMap() {
+            if (map) {
+                markers.forEach(marker => {
+                    if (!marker.options.icon || !marker.options.icon.options.html.includes('⚡')) {
+                        map.removeLayer(marker);
+                    }
+                });
+                markers = markers.filter(marker => 
+                    marker.options.icon && marker.options.icon.options.html.includes('⚡')
+                );
+                
+                if (routeLayer) {
+                    map.removeLayer(routeLayer);
+                    routeLayer = null;
+                }
+            }
+            showStatus('🗑️ Map cleared!', 'success');
+        }
+        
+        function resetDemo() {
+            batteryLevel = 75;
+            updateBatteryDisplay();
+            clearMap();
+            if (map) {
+                map.setView([40.7128, -74.0060], 12);
+            }
+            document.getElementById('searchInput').value = '';
+            document.getElementById('batteryInput').value = '';
+            showStatus('🔄 Demo reset!', 'success');
+        }
+        
+        function simulateMovement() {
+            if (!map) return;
+            
+            showStatus('🚗 Simulating movement...', 'info');
+            let steps = 0;
+            const maxSteps = 10;
+            
+            const interval = setInterval(() => {
+                const center = map.getCenter();
+                const newCenter = [
+                    center.lat + (Math.random() - 0.5) * 0.001,
+                    center.lng + (Math.random() - 0.5) * 0.001
+                ];
+                
+                map.setView(newCenter, map.getZoom());
+                
+                // Simulate battery drain
+                if (Math.random() > 0.7 && batteryLevel > 0) {
+                    batteryLevel = Math.max(0, batteryLevel - 1);
+                    updateBatteryDisplay();
+                }
+                
+                steps++;
+                if (steps >= maxSteps) {
+                    clearInterval(interval);
+                    showStatus('🚗 Movement simulation complete!', 'success');
+                }
+            }, 800);
+        }
+        
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.classList.add('show');
+            
+            setTimeout(() => {
+                statusEl.classList.remove('show');
+            }, type === 'error' ? 5000 : 3000);
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add Enter key support for search
+            document.getElementById('searchInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    searchLocation();
+                }
+            });
+            
+            document.getElementById('batteryInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    updateBattery();
+                }
+            });
+            
+            // Initialize battery display
+            updateBatteryDisplay();
+            
+            // Try to initialize map
+            setTimeout(initMap, 100);
+        });
+        
+        // Handle offline/online events
+        window.addEventListener('online', function() {
+            showStatus('🌐 Back online! You can now use all features.', 'success');
+        });
+        
+        window.addEventListener('offline', function() {
+            showStatus('📱 You are offline. Some features may be limited.', 'warning');
+        });
+    </script>
+</body>
+</html>
