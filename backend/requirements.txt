@@ -6,3 +6,4 @@ pydantic
 PyQt6
 sqlalchemy
 PyQt6-WebEngine
+beautifulsoup4
