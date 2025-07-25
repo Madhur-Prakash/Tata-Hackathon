@@ -215,50 +215,66 @@
     <div class="container">
         <h1>🚗 Enhanced Navigation System</h1>
         
+        <!-- User Controls Section -->
         <div class="controls">
+            <!-- Search input with autocomplete suggestions -->
             <input type="text" id="searchInput" placeholder="Search destination..." />
             <ul id="suggestions"></ul>
+            
+            <!-- Action buttons for map interaction -->
             <button onclick="searchLocation()">Search</button>
             <button onclick="addMarker()">Add Marker</button>
             <button onclick="clearMarkers()">Clear Markers</button>
             <button onclick="getCurrentLocation()">My Location</button>
+            
+            <!-- Battery level management -->
             <input type="number" id="batteryInput" placeholder="Battery level (%)" min="0" max="100" />
             <button onclick="updateBatteryLevel()">Set Battery</button>
+            
+            <!-- Navigation control buttons (initially hidden) -->
             <button id="startRouteBtn" onclick="startRoute()" style="display: none; background: #4caf50;">Start Route</button>
             <button id="trackingBtn" onclick="toggleTracking()" style="display: none;">Stop Navigation</button>
         </div>
 
         <div class="main-content">
+            <!-- Map Display Section -->
             <div class="map-section">
                 <div id="map"></div>
+                <!-- Real-time vehicle information display -->
                 <div class="info">
                     <div id="speedDisplay" style="margin-bottom: 5px; font-weight: bold;">🚗 Speed: 0 km/h</div>
                     <div id="batteryDisplay" style="font-weight: bold;">🔋 Battery: 22%</div>
                 </div>
             </div>
 
+            <!-- Navigation Instructions Panel -->
             <div class="directions-panel">
                 <h3 style="margin-top: 0;">🧭 Navigation</h3>
                 
+                <!-- Route overview information (hidden until route is calculated) -->
                 <div class="route-info-panel" id="routeInfoPanel" style="display: none;">
                     <div class="eta-info">
                         <span id="remainingDistance">-- km</span>
                         <span id="estimatedTime">-- min</span>
                     </div>
+                    <!-- Progress bar showing route completion -->
                     <div class="progress-bar">
                         <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
                     </div>
+                    <!-- Route preview message -->
                     <div id="routePreview" style="text-align: center; margin-top: 10px;">
                         <p style="color: #666; font-size: 14px; margin: 5px 0;">Route preview - Click "Start Route" to begin navigation</p>
                     </div>
                 </div>
 
+                <!-- Current turn-by-turn instruction (shown during active navigation) -->
                 <div id="currentInstruction" class="current-instruction" style="display: none;">
                     <div id="nextTurnIcon">🔄</div>
                     <div id="nextTurnText">Calculating route...</div>
                     <div id="nextTurnDistance" style="font-size: 14px; color: #666; margin-top: 5px;"></div>
                 </div>
 
+                <!-- Complete list of all route directions -->
                 <div id="allDirections">
                     <h4>Route Overview</h4>
                     <div id="directionsList">
@@ -268,10 +284,13 @@
             </div>
         </div>
         
+        <!-- Status messages display -->
         <div id="statusDisplay" class="status"></div>
     </div>
 
+    <!-- Dynamic Leaflet.js library loading -->
     <script>
+        // Dynamically load Leaflet.js library to avoid dependency issues
         function loadLeaflet(callback) {
             const script = document.createElement('script');
             script.src = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js";
@@ -279,6 +298,7 @@
             document.head.appendChild(script);
         }
 
+        // Initialize map when page loads
         window.onload = function () {
             loadLeaflet(function () {
                 initMap();
@@ -287,25 +307,35 @@
     </script>
 
     <script>
-        let map;
-        let markers = [];
-        let lastPosition = null;
-        let batteryLevel = 22;
-        let watchId = null;
-        let isTracking = false;
-        let currentLocation = null;
-        let routeLayer = null;
-        let userMarker = null;
-        let carIcon = null;
-        let routeCoordinates = [];
-        let currentRouteIndex = 0;
-        let routeInstructions = [];
-        let totalRouteDistance = 0;
-        let totalRouteDuration = 0;
-        let distanceTraveled = 0;
-        let navigationStarted = false;
-        let destinationMarker = null;
+        // ===== GLOBAL VARIABLES =====
         
+        // Core map and marker management
+        let map;                           // Leaflet map instance
+        let markers = [];                  // Array of all user-placed markers
+        let userMarker = null;             // User's current location marker
+        let carIcon = null;                // Moving car icon representing user
+        let destinationMarker = null;      // Destination marker
+        
+        // Location and tracking state
+        let lastPosition = null;           // Previous GPS position for speed calculation
+        let currentLocation = null;        // Current user location {lat, lng}
+        let watchId = null;                // Geolocation watch ID for continuous tracking
+        let isTracking = false;            // Whether GPS tracking is active
+        
+        // Route and navigation data
+        let routeLayer = null;             // Leaflet polyline showing the route
+        let routeCoordinates = [];         // Array of [lat, lng] points along route
+        let routeInstructions = [];        // Turn-by-turn navigation instructions
+        let currentRouteIndex = 0;         // Current position index in route array
+        let totalRouteDistance = 0;        // Total route distance in meters
+        let totalRouteDuration = 0;        // Total estimated time in seconds
+        let distanceTraveled = 0;          // Distance already traveled in meters
+        let navigationStarted = false;     // Whether active navigation is running
+        
+        // Vehicle state
+        let batteryLevel = 22;             // Current battery percentage
+        
+        // DOM element references for frequent updates
         const speedDisplay = document.getElementById('speedDisplay');
         const batteryDisplay = document.getElementById('batteryDisplay');
         const statusDisplay = document.getElementById('statusDisplay');
@@ -313,7 +343,12 @@
         const startRouteBtn = document.getElementById('startRouteBtn');
         const suggestionsList = document.getElementById('suggestions');
 
-        // Create custom car icon
+        // ===== UTILITY FUNCTIONS =====
+
+        /**
+         * Creates a custom car icon for representing user's vehicle on map
+         * Returns a Leaflet divIcon with car emoji and styling
+         */
         function createCarIcon() {
             return L.divIcon({
                 html: `<div style="
@@ -336,17 +371,60 @@
             });
         }
 
+        /**
+         * Calculates distance between two GPS coordinates using Haversine formula
+         * @param {number} lat1 - Latitude of first point
+         * @param {number} lon1 - Longitude of first point  
+         * @param {number} lat2 - Latitude of second point
+         * @param {number} lon2 - Longitude of second point
+         * @returns {number} Distance in meters
+         */
+        function haversine(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // Earth's radius in meters
+            const toRad = (deg) => deg * Math.PI / 180;
+
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+            const a = Math.sin(dLat/2)**2 + 
+                     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        /**
+         * Updates status display with timestamp and styling
+         * @param {string} message - Status message to display
+         * @param {string} type - Message type: "info", "success", "error"
+         */
+        function updateStatus(message, type = "info") {
+            const timestamp = new Date().toLocaleTimeString();
+            statusDisplay.textContent = `[${timestamp}] ${message}`;
+            statusDisplay.className = `status ${type}`;
+            console.log(message); // Also log to console for debugging
+        }
+
+        // ===== MAP INITIALIZATION =====
+
+        /**
+         * Initializes the Leaflet map with default view and event handlers
+         * Sets up OpenStreetMap tiles and click event for adding markers
+         */
         function initMap() {
             try {
-                map = L.map('map').setView([28.6139, 77.2090], 13); // Delhi coordinates
+                // Create map centered on Delhi, India with zoom level 13
+                map = L.map('map').setView([28.6139, 77.2090], 13);
+                
+                // Add OpenStreetMap tile layer
                 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '&copy; OpenStreetMap contributors'
                 }).addTo(map);
 
+                // Add click event handler for manual marker placement
                 map.on('click', function(e) {
                     const lat = e.latlng.lat;
                     const lng = e.latlng.lng;
                     
+                    // Create marker at clicked location
                     const marker = L.marker([lat, lng]).addTo(map);
                     marker.bindPopup(`<b>Coordinates:</b><br>Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}`);
                     markers.push(marker);
@@ -358,13 +436,12 @@
             }
         }
 
-        function updateStatus(message, type = "info") {
-            const timestamp = new Date().toLocaleTimeString();
-            statusDisplay.textContent = `[${timestamp}] ${message}`;
-            statusDisplay.className = `status ${type}`;
-            console.log(message);
-        }
+        // ===== BATTERY MANAGEMENT =====
 
+        /**
+         * Updates the vehicle's battery level from user input
+         * Validates input and updates display
+         */
         function updateBatteryLevel() {
             const input = document.getElementById('batteryInput').value;
             const value = parseInt(input);
@@ -378,6 +455,12 @@
             }
         }
 
+        // ===== NAVIGATION CONTROL =====
+
+        /**
+         * Toggles GPS tracking on/off
+         * Called by the tracking button
+         */
         function toggleTracking() {
             if (isTracking) {
                 stopTracking();
@@ -386,12 +469,18 @@
             }
         }
 
+        /**
+         * Starts active navigation mode
+         * Switches from route preview to turn-by-turn navigation
+         */
         function startRoute() {
+            // Validate that a route exists
             if (!routeCoordinates.length) {
                 updateStatus("No route available. Please search for a destination first.", "error");
                 return;
             }
 
+            // Update navigation state
             navigationStarted = true;
             startRouteBtn.style.display = 'none';
             trackingBtn.style.display = 'inline-block';
@@ -404,45 +493,58 @@
                 routePreview.style.display = 'none';
             }
 
-            // Show current instruction panel
+            // Show current instruction panel for active navigation
             document.getElementById('currentInstruction').style.display = 'block';
 
-            // Start location tracking
+            // Start GPS tracking for navigation
             startTracking();
 
             updateStatus("Navigation started! Follow the turn-by-turn directions.", "success");
         }
 
+        /**
+         * Starts continuous GPS tracking
+         * Uses high accuracy mode for navigation
+         */
         function startTracking() {
             if (!navigator.geolocation) {
                 updateStatus("Geolocation is not supported by this browser", "error");
                 return;
             }
 
+            // GPS options for high accuracy navigation
             const options = {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 1000
+                enableHighAccuracy: true,  // Use GPS instead of network location
+                timeout: 10000,           // 10 second timeout
+                maximumAge: 1000          // Accept cached location up to 1 second old
             };
 
             updateStatus("Starting navigation tracking...", "info");
             
+            // Start watching position changes
             watchId = navigator.geolocation.watchPosition(
                 handleLocationSuccess,
                 handleLocationError,
                 options
             );
             
+            // Update UI state
             isTracking = true;
             trackingBtn.textContent = "Stop Navigation";
             trackingBtn.style.background = "#f44336";
         }
 
+        /**
+         * Stops GPS tracking and returns to route preview mode
+         */
         function stopTracking() {
+            // Stop GPS watching
             if (watchId !== null) {
                 navigator.geolocation.clearWatch(watchId);
                 watchId = null;
             }
+            
+            // Reset navigation state
             isTracking = false;
             navigationStarted = false;
             trackingBtn.textContent = "Start Navigation";
@@ -462,14 +564,23 @@
             updateStatus("Navigation stopped - Route preview mode", "info");
         }
 
+        // ===== GPS LOCATION HANDLING =====
+
+        /**
+         * Handles successful GPS location updates
+         * Calculates speed, updates car position, and manages navigation
+         * @param {GeolocationPosition} position - GPS position object
+         */
         async function handleLocationSuccess(position) {
             try {
+                // Validate position data
                 if (!position || !position.coords) {
                     throw new Error("Invalid position data received");
                 }
 
                 const { latitude: lat, longitude: lng, accuracy, heading } = position.coords;
                 
+                // Validate coordinate values
                 if (typeof lat !== 'number' || typeof lng !== 'number' || 
                     isNaN(lat) || isNaN(lng) || 
                     lat < -90 || lat > 90 || lng < -180 || lng > 180) {
@@ -478,21 +589,22 @@
 
                 updateStatus(`Location: ${lat.toFixed(6)}, ${lng.toFixed(6)} (±${accuracy?.toFixed(0)}m)`, "success");
 
-                // Calculate speed if we have a previous position
+                // Calculate speed using previous position
                 if (lastPosition && lastPosition.timestamp) {
                     const dist = haversine(lastPosition.lat, lastPosition.lng, lat, lng);
-                    const timeDiff = (position.timestamp - lastPosition.timestamp) / 1000;
+                    const timeDiff = (position.timestamp - lastPosition.timestamp) / 1000; // seconds
                     
                     if (timeDiff > 0) {
-                        const speedMps = dist / timeDiff;
-                        const speedKmph = speedMps * 3.6;
+                        const speedMps = dist / timeDiff;           // meters per second
+                        const speedKmph = speedMps * 3.6;          // convert to km/h
                         speedDisplay.textContent = `🚗 Speed: ${speedKmph.toFixed(2)} km/h`;
                         
-                        // Update distance traveled
+                        // Update distance traveled for navigation progress
                         distanceTraveled += dist;
                     }
                 }
 
+                // Store current position for next speed calculation
                 lastPosition = {
                     lat,
                     lng,
@@ -501,15 +613,15 @@
 
                 currentLocation = { lat, lng };
 
-                // Update or create car icon
+                // Update car icon position and rotation
                 updateCarPosition(lat, lng, heading);
 
-                // Update navigation if route exists and navigation has started
+                // Update navigation progress if route exists and navigation is active
                 if (routeCoordinates.length > 0 && navigationStarted) {
                     updateNavigationProgress(lat, lng);
                 }
 
-                // Send to backend (if available)
+                // Send location to backend (optional - for fleet management)
                 await sendLocationUpdate(lat, lng);
 
             } catch (error) {
@@ -517,10 +629,18 @@
             }
         }
 
+        /**
+         * Updates or creates the car icon on the map
+         * @param {number} lat - Latitude
+         * @param {number} lng - Longitude  
+         * @param {number} heading - Direction in degrees (optional)
+         */
         function updateCarPosition(lat, lng, heading) {
             if (carIcon) {
+                // Update existing car icon position
                 carIcon.setLatLng([lat, lng]);
-                // Update car rotation based on heading if available
+                
+                // Rotate car icon based on heading direction
                 if (heading !== undefined && heading !== null) {
                     const carElement = carIcon.getElement();
                     if (carElement) {
@@ -531,20 +651,26 @@
                     }
                 }
             } else {
+                // Create new car icon
                 carIcon = L.marker([lat, lng], { icon: createCarIcon() }).addTo(map);
                 carIcon.bindPopup('<b>🚗 Your Vehicle</b>').openPopup();
             }
             
-            // Center map on car only if navigation is active
+            // Center map on car only during active navigation
             if (isTracking && navigationStarted) {
                 map.setView([lat, lng], map.getZoom());
             }
         }
 
+        /**
+         * Updates navigation progress and instructions based on current location
+         * @param {number} currentLat - Current latitude
+         * @param {number} currentLng - Current longitude
+         */
         function updateNavigationProgress(currentLat, currentLng) {
             if (routeCoordinates.length === 0) return;
 
-            // Find closest point on route
+            // Find closest point on the planned route
             let closestIndex = 0;
             let minDistance = Infinity;
 
@@ -559,7 +685,7 @@
 
             currentRouteIndex = closestIndex;
 
-            // Calculate remaining distance
+            // Calculate remaining distance along the route
             let remainingDistance = 0;
             for (let i = closestIndex; i < routeCoordinates.length - 1; i++) {
                 const [lat1, lng1] = routeCoordinates[i];
@@ -567,29 +693,35 @@
                 remainingDistance += haversine(lat1, lng1, lat2, lng2);
             }
 
-            // Update UI
+            // Update navigation display
             const remainingKm = (remainingDistance / 1000).toFixed(2);
             const progress = ((totalRouteDistance - remainingDistance) / totalRouteDistance) * 100;
-            const estimatedTimeMin = (remainingDistance / 1000 / 50 * 60).toFixed(0); // Assuming 50km/h average
+            const estimatedTimeMin = (remainingDistance / 1000 / 50 * 60).toFixed(0); // Assuming 50km/h average speed
 
             document.getElementById('remainingDistance').textContent = `${remainingKm} km left`;
             document.getElementById('estimatedTime').textContent = `${estimatedTimeMin} min ETA`;
             document.getElementById('progressFill').style.width = `${Math.max(0, Math.min(100, progress))}%`;
 
-            // Update current instruction
+            // Update current turn instruction
             updateCurrentInstruction(currentLat, currentLng);
         }
 
+        /**
+         * Updates the current turn-by-turn instruction display
+         * @param {number} currentLat - Current latitude
+         * @param {number} currentLng - Current longitude
+         */
         function updateCurrentInstruction(currentLat, currentLng) {
             if (routeInstructions.length === 0) return;
 
-            // Find next instruction
+            // Find next upcoming instruction
             let nextInstruction = null;
             for (let instruction of routeInstructions) {
                 const [instLat, instLng] = instruction.location;
                 const distanceToInstruction = haversine(currentLat, currentLng, instLat, instLng);
                 
-                if (distanceToInstruction > 5) { // More than 5 meters away
+                // Only show instructions that are more than 5 meters away
+                if (distanceToInstruction > 5) {
                     nextInstruction = {
                         ...instruction,
                         distance: distanceToInstruction
@@ -599,10 +731,12 @@
             }
 
             if (nextInstruction) {
+                // Format distance display
                 const distanceText = nextInstruction.distance < 1000 
                     ? `${Math.round(nextInstruction.distance)}m`
                     : `${(nextInstruction.distance / 1000).toFixed(1)}km`;
 
+                // Update instruction display
                 document.getElementById('nextTurnIcon').textContent = getInstructionIcon(nextInstruction.maneuver);
                 document.getElementById('nextTurnText').textContent = nextInstruction.instruction;
                 document.getElementById('nextTurnDistance').textContent = `in ${distanceText}`;
@@ -611,7 +745,13 @@
             }
         }
 
+        /**
+         * Maps maneuver types to appropriate emoji icons
+         * @param {string} maneuver - OSRM maneuver type
+         * @returns {string} Emoji representing the maneuver
+         */
         function getInstructionIcon(maneuver) {
+            // console.log(`Getting icon for maneuver: ${maneuver}`);
             const icons = {
                 'turn-left': '↰',
                 'turn-right': '↱',
@@ -627,6 +767,10 @@
             return icons[maneuver] || '➡️';
         }
 
+        /**
+         * Handles GPS location errors
+         * @param {GeolocationPositionError} error - GPS error object
+         */
         function handleLocationError(error) {
             let message = "Location error: ";
             switch(error.code) {
@@ -646,6 +790,14 @@
             updateStatus(message, "error");
         }
 
+        // ===== BACKEND COMMUNICATION =====
+
+        /**
+         * Sends location update to backend server (optional feature)
+         * Used for fleet management and charging station recommendations
+         * @param {number} lat - Latitude
+         * @param {number} lng - Longitude
+         */
         async function sendLocationUpdate(lat, lng) {
             try {
                 const response = await fetch('http://localhost:8000/api/location/update', {
@@ -668,6 +820,7 @@
 
                 const data = await response.json();
                 
+                // Handle charging station recommendations for low battery
                 if (data.redirectToChargingStation && data.station) {
                     const { lat: clat, lon: clon, name } = data.station;
                     
@@ -683,22 +836,17 @@
                     }
                 }
             } catch (error) {
+                // Backend communication is optional, so only warn if it fails
                 console.warn('Backend communication error:', error.message);
             }
         }
 
-        function haversine(lat1, lon1, lat2, lon2) {
-            const R = 6371000; // Earth's radius in meters
-            const toRad = (deg) => deg * Math.PI / 180;
+        // ===== SEARCH AND SUGGESTIONS =====
 
-            const dLat = toRad(lat2 - lat1);
-            const dLon = toRad(lon2 - lon1);
-            const a = Math.sin(dLat/2)**2 + 
-                     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c;
-        }
-
+        /**
+         * Displays location search suggestions in dropdown
+         * @param {Array} locations - Array of location objects from Nominatim API
+         */
         function showSearchSuggestions(locations) {
             suggestionsList.innerHTML = '';
             locations.forEach((loc, index) => {
@@ -706,25 +854,38 @@
                 li.style.padding = '8px';
                 li.style.cursor = 'pointer';
                 li.textContent = loc.display_name;
+                
+                // Add click handler for selection
                 li.addEventListener('click', () => {
                     selectSuggestion(loc);
                 });
+                
+                // Add hover effects
                 li.addEventListener('mouseenter', () => {
                     li.style.backgroundColor = '#f0f0f0';
                 });
                 li.addEventListener('mouseleave', () => {
                     li.style.backgroundColor = 'white';
                 });
+                
                 suggestionsList.appendChild(li);
             });
             suggestionsList.style.display = 'block';
         }
 
+        /**
+         * Clears the search suggestions dropdown
+         */
         function clearSuggestions() {
             suggestionsList.innerHTML = '';
             suggestionsList.style.display = 'none';
         }
 
+        /**
+         * Handles selection of a search suggestion
+         * Creates destination marker and calculates route
+         * @param {Object} location - Selected location object from Nominatim
+         */
         function selectSuggestion(location) {
             clearSuggestions();
             document.getElementById('searchInput').value = location.display_name;
@@ -732,6 +893,7 @@
             const lat = parseFloat(location.lat);
             const lng = parseFloat(location.lon);
 
+            // Validate coordinates
             if (isNaN(lat) || isNaN(lng)) {
                 updateStatus("Invalid coordinates in selected suggestion", "error");
                 return;
@@ -748,12 +910,12 @@
                 map.removeLayer(destinationMarker);
             }
 
-            // Reset navigation state
+            // Reset navigation state to preview mode
             navigationStarted = false;
             startRouteBtn.style.display = 'none';
             trackingBtn.style.display = 'none';
 
-            // Show marker at destination
+            // Create destination marker
             destinationMarker = L.marker([lat, lng], {
                 icon: L.icon({
                     iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -768,10 +930,11 @@
 
             updateStatus(`Selected destination: ${location.display_name}`, "success");
 
-            // Draw route if current location known
+            // Calculate and draw route
             if (currentLocation) {
                 drawRoute(currentLocation.lat, currentLocation.lng, lat, lng);
             } else {
+                // Get current location first, then draw route
                 getCurrentLocation().then(() => {
                     if (currentLocation) {
                         drawRoute(currentLocation.lat, currentLocation.lng, lat, lng);
@@ -780,9 +943,19 @@
             }
         }
 
+        // ===== ROUTE CALCULATION =====
+
+        /**
+         * Calculates and displays route using OSRM routing service
+         * @param {number} lat1 - Start latitude
+         * @param {number} lon1 - Start longitude
+         * @param {number} lat2 - End latitude  
+         * @param {number} lon2 - End longitude
+         */
         async function drawRoute(lat1, lon1, lat2, lon2) {
             updateStatus("Calculating optimized route with directions...", "info");
 
+            // OSRM API URL for route calculation with turn-by-turn instructions
             const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson&steps=true`;
 
             try {
@@ -797,32 +970,35 @@
                 }
 
                 const route = data.routes[0];
+                
+                // Convert coordinates from [lng, lat] to [lat, lng] for Leaflet
                 const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
                 routeCoordinates = coords;
                 totalRouteDistance = route.distance;
                 totalRouteDuration = route.duration;
                 distanceTraveled = 0;
 
-                // Remove existing route
+                // Remove existing route line
                 if (routeLayer) {
                     map.removeLayer(routeLayer);
                 }
 
+                // Draw new route line with dashed style
                 routeLayer = L.polyline(coords, { 
                     color: '#2196f3', 
                     weight: 6, 
                     opacity: 0.8,
-                    dashArray: '10, 5'
+                    dashArray: '10, 5'  // Dashed line style
                 }).addTo(map);
 
-                // Fit map bounds to show both start and end points
+                // Fit map to show entire route
                 const bounds = L.latLngBounds([[lat1, lon1], [lat2, lon2]]);
                 map.fitBounds(bounds, { padding: [20, 20] });
 
                 // Process turn-by-turn directions
                 processRouteInstructions(route.legs[0].steps);
 
-                // Update route info display
+                // Update route information display
                 const routeInfoPanel = document.getElementById('routeInfoPanel');
                 const remainingDistance = document.getElementById('remainingDistance');
                 const estimatedTime = document.getElementById('estimatedTime');
@@ -831,7 +1007,7 @@
                 estimatedTime.textContent = `${(route.duration/60).toFixed(0)} min`;
                 routeInfoPanel.style.display = 'block';
 
-                // Show start route button
+                // Show start route button for beginning navigation
                 startRouteBtn.style.display = 'inline-block';
                 
                 // Show route preview message
@@ -847,6 +1023,11 @@
             }
         }
 
+        /**
+         * Processes OSRM route steps into navigation instructions
+         * Updates the directions list with turn-by-turn instructions
+         * @param {Array} steps - Array of route steps from OSRM API
+         */
         function processRouteInstructions(steps) {
             routeInstructions = [];
             const directionsList = document.getElementById('directionsList');
@@ -856,14 +1037,14 @@
                 const instruction = {
                     instruction: step.maneuver.instruction || `${step.maneuver.type.replace(/-/g, ' ')}`,
                     maneuver: step.maneuver.type,
-                    location: [step.maneuver.location[1], step.maneuver.location[0]], // lat, lng
+                    location: [step.maneuver.location[1], step.maneuver.location[0]], // Convert to [lat, lng]
                     distance: step.distance,
                     duration: step.duration
                 };
 
                 routeInstructions.push(instruction);
 
-                // Add to directions list
+                // Create instruction display element
                 const instructionDiv = document.createElement('div');
                 instructionDiv.className = 'instruction-item';
                 instructionDiv.innerHTML = `
@@ -872,9 +1053,10 @@
                     <span class="instruction-distance">${(instruction.distance/1000).toFixed(2)} km</span>
                 `;
                 directionsList.appendChild(instructionDiv);
+                console.log("instruction:", instruction);
             });
 
-            // Add final destination
+            // Add final destination instruction
             const finalInstruction = document.createElement('div');
             finalInstruction.className = 'instruction-item';
             finalInstruction.innerHTML = `
@@ -885,6 +1067,12 @@
             directionsList.appendChild(finalInstruction);
         }
 
+        // ===== USER ACTIONS =====
+
+        /**
+         * Searches for locations using Nominatim geocoding API
+         * Shows suggestions dropdown for user selection
+         */
         async function searchLocation() {
             const query = document.getElementById('searchInput').value.trim();
             if (!query) {
@@ -892,7 +1080,7 @@
                 return;
             }
 
-            // Get current location if not available
+            // Ensure current location is available for route calculation
             if (!currentLocation) {
                 if (!navigator.geolocation) {
                     updateStatus("Geolocation not supported", "error");
@@ -918,6 +1106,7 @@
             try {
                 updateStatus("Searching for location...", "info");
 
+                // Search within India's bounding box for better results
                 const indiaViewbox = "68.1114,35.6745,97.3956,6.5546";
                 const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=${indiaViewbox}&bounded=1&limit=5&addressdetails=1`;
 
@@ -934,6 +1123,7 @@
                     return;
                 }
 
+                // Show search suggestions dropdown
                 showSearchSuggestions(data);
 
             } catch (error) {
@@ -941,6 +1131,9 @@
             }
         }
 
+        /**
+         * Adds a marker at the current map center
+         */
         function addMarker() {
             try {
                 const center = map.getCenter();
@@ -953,14 +1146,18 @@
             }
         }
 
+        /**
+         * Clears all markers, routes, and resets navigation state
+         */
         function clearMarkers() {
             try {
+                // Remove all user-placed markers
                 markers.forEach(marker => {
                     map.removeLayer(marker);
                 });
                 markers = [];
                 
-                // Clear route and navigation data
+                // Clear route visualization
                 if (routeLayer) {
                     map.removeLayer(routeLayer);
                     routeLayer = null;
@@ -972,20 +1169,21 @@
                     destinationMarker = null;
                 }
                 
+                // Reset all navigation data
                 routeCoordinates = [];
                 routeInstructions = [];
                 currentRouteIndex = 0;
                 distanceTraveled = 0;
                 navigationStarted = false;
                 
-                // Hide navigation panels and buttons
+                // Hide navigation UI elements
                 document.getElementById('routeInfoPanel').style.display = 'none';
                 document.getElementById('currentInstruction').style.display = 'none';
                 startRouteBtn.style.display = 'none';
                 trackingBtn.style.display = 'none';
                 document.getElementById('directionsList').innerHTML = 'Search for a destination to see turn-by-turn directions';
                 
-                // Stop any active tracking
+                // Stop any active GPS tracking
                 if (isTracking) {
                     stopTracking();
                 }
