@@ -1194,105 +1194,169 @@
             }
         }
 
-        function getCurrentLocation() {
-            return new Promise((resolve, reject) => {
-                if (!navigator.geolocation) {
-                    updateStatus('Geolocation is not supported by this browser', "error");
-                    reject(new Error('Geolocation not supported'));
-                    return;
-                }
-
-                updateStatus("Getting current location...", "info");
-
-                navigator.geolocation.getCurrentPosition(
-                    function(position) {
-                        try {
-                            const lat = position.coords.latitude;
-                            const lng = position.coords.longitude;
-
-                            if (isNaN(lat) || isNaN(lng)) {
-                                throw new Error("Invalid coordinates received");
-                            }
-
-                            currentLocation = { lat, lng };
-                            updateCarPosition(lat, lng);
-
-                            map.setView([lat, lng], 15);
-
-                            updateStatus(`Current location: ${lat.toFixed(6)}, ${lng.toFixed(6)}`, "success");
-                            resolve(currentLocation);
-                        } catch (error) {
-                            updateStatus(`Error processing location: ${error.message}`, "error");
-                            reject(error);
-                        }
-                    },
-                    function(error) {
-                        handleLocationError(error);
-                        reject(error);
-                    },
-                    { enableHighAccuracy: true, timeout: 10000 }
-                );
-            });
+        /**
+ * Promisified function to get user's current GPS location
+ * Returns a Promise that resolves with location coordinates or rejects with error
+ * @returns {Promise<Object>} Promise resolving to {lat, lng} coordinates
+ */
+function getCurrentLocation() {
+    return new Promise((resolve, reject) => {
+        // Check if browser supports geolocation API
+        if (!navigator.geolocation) {
+            updateStatus('Geolocation is not supported by this browser', "error");
+            reject(new Error('Geolocation not supported'));
+            return;
         }
 
-        // Click outside to close suggestions
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('#searchInput') && !e.target.closest('#suggestions')) {
-                clearSuggestions();
-            }
-        });
+        updateStatus("Getting current location...", "info");
 
-        // Allow Enter key for search
-        document.getElementById('searchInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                searchLocation();
-            }
-        });
+        // Request current position with high accuracy
+        navigator.geolocation.getCurrentPosition(
+            // Success callback - called when location is obtained
+            function(position) {
+                try {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
 
-        // Real-time search suggestions
-        document.getElementById('searchInput').addEventListener('input', function(e) {
-            const query = e.target.value.trim();
-            if (query.length > 2) {
-                // Debounce the search
-                clearTimeout(this.searchTimeout);
-                this.searchTimeout = setTimeout(() => {
-                    searchForSuggestions(query);
-                }, 500);
-            } else {
-                clearSuggestions();
-            }
-        });
-
-        async function searchForSuggestions(query) {
-            try {
-                const indiaViewbox = "68.1114,35.6745,97.3956,6.5546";
-                const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=${indiaViewbox}&bounded=1&limit=5&addressdetails=1`;
-
-                const response = await fetch(url);
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.length > 0) {
-                        showSearchSuggestions(data);
+                    // Validate that coordinates are valid numbers
+                    if (isNaN(lat) || isNaN(lng)) {
+                        throw new Error("Invalid coordinates received");
                     }
+
+                    // Store location globally for use in other functions
+                    currentLocation = { lat, lng };
+                    
+                    // Update car icon position on map
+                    updateCarPosition(lat, lng);
+
+                    // Center map on user's location with zoom level 15
+                    map.setView([lat, lng], 15);
+
+                    updateStatus(`Current location: ${lat.toFixed(6)}, ${lng.toFixed(6)}`, "success");
+                    
+                    // Resolve promise with location data
+                    resolve(currentLocation);
+                } catch (error) {
+                    updateStatus(`Error processing location: ${error.message}`, "error");
+                    reject(error);
                 }
-            } catch (error) {
-                console.warn('Suggestion search error:', error);
+            },
+            // Error callback - called when location request fails
+            function(error) {
+                handleLocationError(error);
+                reject(error);
+            },
+            // Options for location request
+            { 
+                enableHighAccuracy: true, // Use GPS instead of network location
+                timeout: 10000           // 10 second timeout
+            }
+        );
+    });
+}
+
+// ===== EVENT LISTENERS FOR USER INTERFACE =====
+
+/**
+ * Click outside search area to close suggestions dropdown
+ * Improves user experience by hiding suggestions when clicking elsewhere
+ */
+document.addEventListener('click', function(e) {
+    // Check if click was outside both search input and suggestions list
+    if (!e.target.closest('#searchInput') && !e.target.closest('#suggestions')) {
+        clearSuggestions();
+    }
+});
+
+/**
+ * Allow Enter key to trigger search from input field
+ * Provides keyboard shortcut for better accessibility
+ */
+document.getElementById('searchInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        searchLocation();
+    }
+});
+
+/**
+ * Real-time search suggestions as user types
+ * Provides autocomplete functionality with debouncing to avoid excessive API calls
+ */
+document.getElementById('searchInput').addEventListener('input', function(e) {
+    const query = e.target.value.trim();
+    
+    // Only search if query is longer than 2 characters
+    if (query.length > 2) {
+        // Clear any existing timeout to debounce rapid typing
+        clearTimeout(this.searchTimeout);
+        
+        // Wait 500ms after user stops typing before searching
+        this.searchTimeout = setTimeout(() => {
+            searchForSuggestions(query);
+        }, 500);
+    } else {
+        // Clear suggestions if query too short
+        clearSuggestions();
+    }
+});
+
+/**
+ * Searches for location suggestions in real-time as user types
+ * Uses Nominatim API with India bounding box for relevant results
+ * @param {string} query - Search query string
+ */
+async function searchForSuggestions(query) {
+    try {
+        // Bounding box coordinates for India to limit search results
+        const indiaViewbox = "68.1114,35.6745,97.3956,6.5546";
+        
+        // Construct Nominatim API URL with India bounds and 5 result limit
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=${indiaViewbox}&bounded=1&limit=5&addressdetails=1`;
+
+        const response = await fetch(url);
+        
+        // Only process successful responses
+        if (response.ok) {
+            const data = await response.json();
+            
+            // Show suggestions if any results found
+            if (data.length > 0) {
+                showSearchSuggestions(data);
             }
         }
+    } catch (error) {
+        // Log error but don't show to user as this is background functionality
+        console.warn('Suggestion search error:', error);
+    }
+}
 
-        // Initialize battery display
-        batteryDisplay.textContent = `🔋 Battery: ${batteryLevel}%`;
+// ===== INITIALIZATION CODE =====
 
-        // Auto-start location tracking when page loads
-        window.addEventListener('load', function() {
-            setTimeout(() => {
-                getCurrentLocation().then(() => {
-                    updateStatus("Ready for navigation! Search for a destination to begin.", "success");
-                }).catch(() => {
-                    updateStatus("Click 'My Location' to enable navigation features.", "info");
-                });
-            }, 1000);
+/**
+ * Initialize battery display with current level on page load
+ * Sets initial battery percentage display
+ */
+batteryDisplay.textContent = `🔋 Battery: ${batteryLevel}%`;
+
+/**
+ * Auto-start location tracking when page loads
+ * Attempts to get user location automatically for better user experience
+ * Uses setTimeout to ensure map is fully initialized first
+ */
+window.addEventListener('load', function() {
+    // Wait 1 second for map initialization to complete
+    setTimeout(() => {
+        // Attempt to get current location
+        getCurrentLocation().then(() => {
+            // Success - user granted location permission
+            updateStatus("Ready for navigation! Search for a destination to begin.", "success");
+        }).catch(() => {
+            // Failed - likely permission denied or geolocation unavailable
+            updateStatus("Click 'My Location' to enable navigation features.", "info");
         });
+    }, 1000);
+});
+
     </script>
 </body>
 </html>
