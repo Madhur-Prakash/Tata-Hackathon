@@ -218,8 +218,16 @@
         <!-- User Controls Section -->
         <div class="controls">
             <!-- Search input with autocomplete suggestions -->
-            <input type="text" id="searchInput" placeholder="Search destination..." />
+            <input type="text" id="searchInput" placeholder="Search Starting point..." />
             <ul id="suggestions"></ul>
+            
+            <!-- Action buttons for map interaction -->
+            <button onclick="searchLocation()">Search</button>
+        </div>
+        <div class="controls">
+            <!-- Search input with autocomplete suggestions -->
+            <input type="text" id="DestinationSearchInput" placeholder="Search destination..." />
+            <ul id="DestinationSuggestions"></ul>
             
             <!-- Action buttons for map interaction -->
             <button onclick="searchLocation()">Search</button>
