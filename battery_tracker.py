@@ -24,6 +24,9 @@ def main():
                         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         log_entry = f"[{timestamp}] Battery: {battery_level}%"
                         print(log_entry)
+                        if (battery_level < 20):
+                            log_entry += " - Low battery warning!"
+                            print("Low battery detected! Redirecting to charging station...")
                         log_file.write(log_entry + "\n")
 
 if __name__ == "__main__":
