@@ -1,22 +1,21 @@
 # 🚗 Smart EV Charging Station Locator
 
-A smart electric vehicle charging station locator that tracks your location, monitors battery levels, and automatically suggests nearby charging stations when your battery runs low.
+## Overview
+This project utilizes Leaflet JS, OpenStreetMap (OSM), and Open Source Routing Machine (OSRM) to provide efficient routing. It also incorporates a Cooja simulator to mimic battery percentage drop and track it in real-time. When the battery level falls below a predetermined threshold, the user is presented with an option to redirect to the nearest charging station.
 
 ## 🌟 Features
 
-- **Real-time Location Tracking**: Uses GPS to track your current location
-- **Battery Monitoring**: Monitor your EV's battery level in real-time
-- **Smart Notifications**: Automatically suggests charging stations when battery < 25%
-- **Interactive Map**: OpenStreetMap-based interface with search functionality
-- **Speed Tracking**: Shows current vehicle speed
-- **Route History**: Stores location and battery data
+* **Real-time Battery Tracking**: Simulate battery percentage drop using Cooja simulator and track it in real-time.
+* **Smart Routing**: Utilize OSRM for efficient routing and provide turn-by-turn directions.
+* **Nearest Charging Station Redirect**: Offer users the option to redirect to the nearest charging station when the battery level falls below a certain threshold.
+* **Interactive Map**: Leverage Leaflet JS and OSM to display an interactive map with routing information and charging station locations.
 
 ## 🛠️ Technology Stack
 
-- **Backend**: FastAPI, SQLAlchemy, SQLite
-- **Frontend**: PyQt6, HTML/CSS/JavaScript, Leaflet.js
-- **APIs**: OpenChargeMap API for charging station data
-- **Database**: SQLite for route history
+* **Frontend**: Leaflet JS, OpenStreetMap (OSM), PyQt6
+* **Backend**: FastAPI, Python
+* **Simulator**: Cooja
+* **Routing Engine**: Open Source Routing Machine (OSRM)
 
 ## 🚀 Quick Start
 
