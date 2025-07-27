@@ -9,12 +9,6 @@ import requests
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 
-# Handle both relative and absolute imports
-try:
-    from .routes import location, route, charging
-except ImportError:
-    from routes import location, route, charging
-
 app = FastAPI()
 
 app.add_middleware(
