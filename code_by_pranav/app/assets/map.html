@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Map Display</title>
+    <link rel="stylesheet" href="leaflet.css" />
+    <script src="leaflet.js"></script>
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <style>
+        html, body, #map { 
+            height: 100%; width: 100%; margin: 0; padding: 0; 
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        let map, py_bridge, userMarker = null, startMarker = null, destinationMarker = null, routeLayer = null, isNavigating = false;
+        const tileLayers = {
+            light: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }),
+            dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CARTO' }),
+            street: L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', { attribution: '© OSM, Humanitarian' })
+        };
+        let currentTheme = 'light', currentView = 'light';
+
+        window.onload = function() {
+            new QWebChannel(qt.webChannelTransport, (channel) => { py_bridge = channel.objects.py_bridge; });
+        };
+
+        function startGeolocation() {
+            if (!navigator.geolocation || !py_bridge) return;
+            navigator.geolocation.watchPosition((position) => {
+                const { latitude, longitude, speed } = position.coords;
+                window.mapApi.updateUserPosition(latitude, longitude);
+                py_bridge.update_location_data(latitude, longitude, speed ? speed * 3.6 : 0);
+            });
+        }
+        
+        window.mapApi = {
+            initializeMap: (lat, lng) => {
+                if (map) return; 
+                map = L.map('map').setView([lat, lng], 13);
+                tileLayers.light.addTo(map); 
+                startGeolocation();
+            },
+            updateUserPosition: (lat, lng) => {
+                if (!userMarker) {
+                    const userIcon = L.divIcon({ html: `<div style="background-color: #2196f3; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white;"></div>`, className: 'user-icon', iconSize: [24, 24], iconAnchor: [12, 12] });
+                    userMarker = L.marker([lat, lng], { icon: userIcon, zIndexOffset: 1000 }).addTo(map);
+                    map.setView([lat, lng], 15);
+                } else { userMarker.setLatLng([lat, lng]); }
+                if (isNavigating) { map.panTo([lat, lng]); }
+            },
+            startNavigation: () => { isNavigating = true; if(userMarker) map.panTo(userMarker.getLatLng()); },
+            toggleTheme: () => { if (!map) return; map.removeLayer(tileLayers[currentView]); currentTheme = (currentTheme === 'dark') ? 'light' : 'dark'; currentView = currentTheme; tileLayers[currentTheme].addTo(map); },
+            toggleView: () => { if (!map) return; map.removeLayer(tileLayers[currentView]); currentView = (currentView === currentTheme) ? 'street' : currentTheme; tileLayers[currentView].addTo(map); },
+            setStartMarker: (lat, lng) => { if (!map) return; if(startMarker) startMarker.setLatLng([lat, lng]); else startMarker = L.marker([lat, lng], { icon: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41] }) }).addTo(map); },
+            setDestinationMarker: (lat, lng) => { if (!map) return; if(destinationMarker) destinationMarker.setLatLng([lat, lng]); else destinationMarker = L.marker([lat, lng], { icon: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41] }) }).addTo(map); },
+            drawRoute: (geometry) => { if (!map) return; if (routeLayer) map.removeLayer(routeLayer); routeLayer = L.geoJSON(geometry, { style: { color: '#007BFF', weight: 5 } }).addTo(map); map.fitBounds(routeLayer.getBounds(), {padding: [50, 50]}); },
+            clearMap: () => { if (!map) return; if (routeLayer) map.removeLayer(routeLayer); if (startMarker) map.removeLayer(startMarker); if (destinationMarker) map.removeLayer(destinationMarker); routeLayer = startMarker = destinationMarker = null; }
+        };
+    </script>
+</body>
+</html>
