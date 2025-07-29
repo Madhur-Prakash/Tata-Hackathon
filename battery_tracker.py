@@ -19,6 +19,7 @@ def main():
             while True:
                 data = s.recv(1024).decode('utf-8').strip()
                 if data:
+                    print(f"Received: {data}")  # <-- Add this for debugging
                     battery_level = extract_battery(data)
                     if battery_level is not None:
                         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
