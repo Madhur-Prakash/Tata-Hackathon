@@ -31,7 +31,7 @@ app.include_router(charging.router, prefix="/api/charging")
 
 # Absolute path to your frontend directory
 # frontend_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend')
-frontend_dir = "C:\\Users\\madhu\\OneDrive\\Desktop\\hachathons\\AI_based_EV_System\\app\\assets"
+frontend_dir = "C:\\Users\\madhu\\OneDrive\\Desktop\\hachathons\\Tata hackathon\\PyQT_code\\app\\assets"
 
 # Mount the frontend directory as static files at /static
 app.mount("/static", StaticFiles(directory=frontend_dir), name="static")

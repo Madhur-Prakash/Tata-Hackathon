@@ -3,1300 +3,358 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced OpenStreetMap Navigation</title>
+    <title>Delhi to Amity Navigation</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        html, body { height: 100%; margin: 0; padding: 0; }
-        
-        body {
+        html, body {
+            height: 100%;
             margin: 0;
             padding: 0;
-            font-family: Arial, sans-serif;
-            background: #f0f0f0;
         }
-        
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 10px;
-            padding: 0;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 100%;
+            z-index: 1;
         }
-        
-        h1 {
-            color: #333;
-            text-align: center;
+
+
+        .route-section {
+            background: #fff3cd;
+            border: 2px solid #ff6600;
+            border-radius: 8px;
+            padding: 20px;
             margin-bottom: 20px;
         }
 
-        .main-content {
+        .route-info {
             display: flex;
-            gap: 20px;
-        }
-
-        .map-section {
-            flex: 2;
-        }
-        
-        #map {
-            height: 500px;
-            width: 100%;
-            border-radius: 8px;
-            border: 2px solid #ddd;
-        }
-
-        .directions-panel {
-            flex: 1;
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 15px;
-            max-height: 500px;
-            overflow-y: auto;
-        }
-        
-        .controls {
-            margin: 20px 0;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
+            justify-content: space-between;
             align-items: center;
         }
-        
+
+        .route-stats {
+            display: flex;
+            gap: 30px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            min-width: 100px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ff6600;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+
         button {
-            padding: 10px 15px;
-            background: #007cba;
+            padding: 12px 20px;
+            background: #ff6600;
             color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            font-size: 16px;
             transition: background 0.3s;
         }
         
         button:hover {
-            background: #005a87;
+            background: #e55a00;
         }
-        
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
         }
-        
-        input[type="text"] {
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            flex: 1;
-            min-width: 200px;
-        }
-        
-        input[type="number"] {
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            width: 150px;
-        }
-        
-        .info {
-            margin-top: 15px;
-            padding: 10px;
-            background: #e8f4f8;
-            border-radius: 5px;
-            border-left: 4px solid #007cba;
-        }
-        
+
         .status {
-            margin-top: 10px;
-            padding: 8px;
+            padding: 10px;
             background: #f9f9f9;
-            border-radius: 4px;
+            border-radius: 5px;
             font-family: monospace;
-            font-size: 12px;
+            font-size: 14px;
+            margin-top: 10px;
         }
-        
-        .error {
-            background: #ffebee;
-            border-left: 4px solid #f44336;
-            color: #c62828;
-        }
-        
+
         .success {
             background: #e8f5e8;
             border-left: 4px solid #4caf50;
             color: #2e7d32;
         }
 
-        .current-instruction {
-            background: #e3f2fd;
-            border: 2px solid #2196f3;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
-            font-size: 16px;
-            font-weight: bold;
-        }
-
-        .instruction-item {
-            display: flex;
-            align-items: center;
-            padding: 8px;
-            border-bottom: 1px solid #eee;
-            font-size: 14px;
-        }
-
-        .instruction-icon {
-            margin-right: 10px;
-            font-size: 18px;
-            width: 25px;
-            text-align: center;
-        }
-
-        .instruction-distance {
-            margin-left: auto;
-            color: #666;
-            font-size: 12px;
-        }
-
-        #suggestions {
-            list-style: none;
-            padding: 0;
-            max-height: 150px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            margin-top: 4px;
-            display: none;
-            background: #fff;
-            border-radius: 4px;
-            position: absolute;
-            z-index: 1000;
-            width: 300px;
-        }
-
-        .car-icon {
-            width: 30px !important;
-            height: 30px !important;
-        }
-
-        .route-info-panel {
-            background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-
-        .eta-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 18px;
-            font-weight: bold;
-            color: #2196f3;
-            margin-bottom: 10px;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #e0e0e0;
-            border-radius: 4px;
-            overflow: hidden;
-            margin: 10px 0;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #4caf50, #8bc34a);
-            transition: width 0.3s ease;
+        .error {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+            color: #c62828;
         }
     </style>
 </head>
-<body>
-    <div class="container">
-            
-           
-
-        <div class="main-content">
-            <div class="map-section">
-                <div id="map"></div>
-            
-            </div>
-
-          
+<body>        
+        <div id="map"></div>
+        
+        <div class="controls">
         </div>
         
-        
-    </div>
-
-    <!-- Dynamic Leaflet.js library loading -->
-    <script>
-        // Dynamically load Leaflet.js library to avoid dependency issues
-        function loadLeaflet(callback) {
-            const script = document.createElement('script');
-            script.src = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js";
-            script.onload = callback;
-            document.head.appendChild(script);
-        }
-
-        // Initialize map when page loads
-        window.onload = function () {
-            loadLeaflet(function () {
-                initMap();
-            });
-        };
-    </script>
+        <div class="status" id="statusDisplay">Click "Load Delhi to Amity Route" to begin</div>
 
     <script>
-        // ===== GLOBAL VARIABLES =====
-        
-        // Core map and marker management
-        let map;                           // Leaflet map instance
-        let markers = [];                  // Array of all user-placed markers
-        let userMarker = null;             // User's current location marker
-        let carIcon = null;                // Moving car icon representing user
-        let destinationMarker = null;      // Destination marker
-        
-        // Location and tracking state
-        let lastPosition = null;           // Previous GPS position for speed calculation
-        let currentLocation = null;        // Current user location {lat, lng}
-        let watchId = null;                // Geolocation watch ID for continuous tracking
-        let isTracking = false;            // Whether GPS tracking is active
-        
-        // Route and navigation data
-        let routeLayer = null;             // Leaflet polyline showing the route
-        let routeCoordinates = [];         // Array of [lat, lng] points along route
-        let routeInstructions = [];        // Turn-by-turn navigation instructions
-        let currentRouteIndex = 0;         // Current position index in route array
-        let totalRouteDistance = 0;        // Total route distance in meters
-        let totalRouteDuration = 0;        // Total estimated time in seconds
-        let distanceTraveled = 0;          // Distance already traveled in meters
-        let navigationStarted = false;     // Whether active navigation is running
-        
-        // Vehicle state
-        let batteryLevel = 22;             // Current battery percentage
-        
-        // DOM element references for frequent updates
-        const speedDisplay = document.getElementById('speedDisplay');
-        const batteryDisplay = document.getElementById('batteryDisplay');
-        const statusDisplay = document.getElementById('statusDisplay');
-        const trackingBtn = document.getElementById('trackingBtn');
-        const startRouteBtn = document.getElementById('startRouteBtn');
-        const suggestionsList = document.getElementById('suggestions');
+        // Global variables
+        let map;
+        let routeLayer = null;
+        let startMarker = null;
+        let endMarker = null;
+        let userMarker = null;
+        let currentLocation = null;
+        let isNavigating = false;
 
-        // ===== UTILITY FUNCTIONS =====
+        // Delhi to Amity University hardcoded route coordinates
+        const startCoords = [28.6139, 77.2090]; // Delhi
+        const endCoords = [28.5489, 77.3267];   // Amity University
 
-        /**
-         * Creates a custom car icon for representing user's vehicle on map
-         * Returns a Leaflet divIcon with car emoji and styling
-         */
-        function createCarIcon() {
-            return L.divIcon({
-                html: `<div style="
-                    width: 30px; 
-                    height: 30px; 
-                    background: #2196f3; 
-                    border: 3px solid white; 
-                    border-radius: 50%; 
-                    display: flex; 
-                    align-items: center; 
-                    justify-content: center; 
-                    font-size: 16px; 
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                    transform: rotate(0deg);
-                    transition: transform 0.3s ease;
-                ">🚗</div>`,
-                iconSize: [30, 30],
-                iconAnchor: [15, 15],
-                className: 'car-icon'
-            });
-        }
 
-        /**
-         * Calculates distance between two GPS coordinates using Haversine formula
-         * @param {number} lat1 - Latitude of first point
-         * @param {number} lon1 - Longitude of first point  
-         * @param {number} lat2 - Latitude of second point
-         * @param {number} lon2 - Longitude of second point
-         * @returns {number} Distance in meters
-         */
-        function haversine(lat1, lon1, lat2, lon2) {
-            const R = 6371000; // Earth's radius in meters
-            const toRad = (deg) => deg * Math.PI / 180;
-
-            const dLat = toRad(lat2 - lat1);
-            const dLon = toRad(lon2 - lon1);
-            const a = Math.sin(dLat/2)**2 + 
-                     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c;
-        }
-
-        /**
-         * Updates status display with timestamp and styling
-         * @param {string} message - Status message to display
-         * @param {string} type - Message type: "info", "success", "error"
-         */
-        function updateStatus(message, type = "info") {
-            const timestamp = new Date().toLocaleTimeString();
-            statusDisplay.textContent = `[${timestamp}] ${message}`;
-            statusDisplay.className = `status ${type}`;
-            console.log(message); // Also log to console for debugging
-        }
-
-        // ===== MAP INITIALIZATION =====
-
-        /**
-         * Initializes the Leaflet map with default view and event handlers
-         * Sets up OpenStreetMap tiles and click event for adding markers
-         */
+        // Initialize map
         function initMap() {
-            try {
-                // Create map centered on Delhi, India with zoom level 13
-                map = L.map('map').setView([28.6139, 77.2090], 13);
-                
-                // Add OpenStreetMap tile layer
-                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; OpenStreetMap contributors'
-                }).addTo(map);
-
-                // Add click event handler for manual marker placement
-                map.on('click', function(e) {
-                    const lat = e.latlng.lat;
-                    const lng = e.latlng.lng;
-                    
-                    // Create marker at clicked location
-                    const marker = L.marker([lat, lng]).addTo(map);
-                    marker.bindPopup(`<b>Coordinates:</b><br>Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}`);
-                    markers.push(marker);
-                });
-                
-                updateStatus("Map initialized successfully", "success");
-            } catch (error) {
-                updateStatus(`Map initialization error: ${error.message}`, "error");
-            }
+            map = L.map('map').setView([28.6139, 77.2090], 12);
+            
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+            
+            updateStatus("Map initialized. Ready to load route.", "success");
         }
 
-        // ===== BATTERY MANAGEMENT =====
+        // Load the hardcoded Delhi to Amity route
+        function loadDelhiToAmityRoute() {
+    const startCoords = [28.6139, 77.2090]; // Delhi
+    const endCoords = [28.5450, 77.2732];   // Amity University Noida
 
-        /**
-         * Updates the vehicle's battery level from user input
-         * Validates input and updates display
-         */
-        function updateBatteryLevel() {
-            const input = document.getElementById('batteryInput').value;
-            const value = parseInt(input);
+    const url = `https://router.project-osrm.org/route/v1/driving/${startCoords[1]},${startCoords[0]};${endCoords[1]},${endCoords[0]}?overview=full&geometries=geojson`;
 
-            if (!isNaN(value) && value >= 0 && value <= 100) {
-                batteryLevel = value;
-                batteryDisplay.textContent = `🔋 Battery: ${batteryLevel}%`;
-                updateStatus(`Battery level set to ${batteryLevel}%`, "success");
-            } else {
-                updateStatus('Please enter a valid battery level between 0 and 100.', "error");
-            }
-        }
-
-        // ===== NAVIGATION CONTROL =====
-
-        /**
-         * Toggles GPS tracking on/off
-         * Called by the tracking button
-         */
-        function toggleTracking() {
-            if (isTracking) {
-                stopTracking();
-            } else {
-                startTracking();
-            }
-        }
-
-        /**
-         * Starts active navigation mode
-         * Switches from route preview to turn-by-turn navigation
-         */
-        function startRoute() {
-            // Validate that a route exists
-            if (!routeCoordinates.length) {
-                updateStatus("No route available. Please search for a destination first.", "error");
-                return;
+    fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            if (data.code !== 'Ok') {
+                throw new Error("Route not found");
             }
 
-            // Update navigation state
-            navigationStarted = true;
-            startRouteBtn.style.display = 'none';
-            trackingBtn.style.display = 'inline-block';
-            trackingBtn.textContent = 'Stop Navigation';
-            trackingBtn.style.background = '#f44336';
+            const route = data.routes[0];
 
-            // Hide route preview message
-            const routePreview = document.getElementById('routePreview');
-            if (routePreview) {
-                routePreview.style.display = 'none';
+            // Remove old route if it exists
+            if (window.routeLine) {
+                map.removeLayer(window.routeLine);
             }
 
-            // Show current instruction panel for active navigation
-            document.getElementById('currentInstruction').style.display = 'block';
+            // Draw new route in dark orange
+            window.routeLine = L.geoJSON(route.geometry, {
+                style: { color: '#ff6600', weight: 5 }
+            }).addTo(map);
 
-            // Start GPS tracking for navigation
-            startTracking();
+            // Remove existing markers if any
+            if (startMarker) {
+                map.removeLayer(startMarker);
+            }
+            if (endMarker) {
+                map.removeLayer(endMarker);
+            }
 
-            updateStatus("Navigation started! Follow the turn-by-turn directions.", "success");
-        }
+            // Create red marker icons
+            const redMarkerIcon = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        });
 
-        /**
-         * Starts continuous GPS tracking
-         * Uses high accuracy mode for navigation
-         */
-        function startTracking() {
+
+        
+        const distanceKm = (route.distance / 1000).toFixed(2);
+        const durationMin = Math.round(route.duration / 60);
+        
+        // Add start and end markers
+        startMarker = L.marker(startCoords, {icon: redMarkerIcon}).addTo(map).bindPopup("📍 Start: Delhi<br>Total Distance: " + distanceKm + " km<br>Duration: " + durationMin + " min").openPopup();
+        endMarker = L.marker(endCoords, {icon: redMarkerIcon}).addTo(map).bindPopup("🏁 End: Amity University<br>Total Distance: " + distanceKm + " km<br>Duration: " + durationMin + " min").openPopup();
+
+        document.getElementById('routeSummary').innerHTML = `
+                🚗 Route Summary: <strong style="color: #ff6600;">${distanceKm} km</strong> 
+                in <strong style="color: #ff6600;">${durationMin} minutes</strong>
+            `;
+
+            document.getElementById('routeStatus').textContent = 'Loaded';
+            document.getElementById('startNavBtn').style.display = 'inline-block';
+
+            updateStatus(`Route loaded! Distance: ${distanceKm} km, Time: ${durationMin} min`, "success");
+        })
+        .catch(err => {
+            console.error("Error loading route:", err);
+            document.getElementById('routeStatus').textContent = 'Error loading route';
+            document.getElementById('routeSummary').innerHTML = `<span style="color: red;">❌ Failed to load route.</span>`;
+            updateStatus("❌ Failed to load route", "error");
+        });
+}
+
+        // Get current location
+        function getCurrentLocation() {
             if (!navigator.geolocation) {
-                updateStatus("Geolocation is not supported by this browser", "error");
+                updateStatus("Geolocation not supported", "error");
                 return;
             }
 
-            // GPS options for high accuracy navigation
-            const options = {
-                enableHighAccuracy: true,  // Use GPS instead of network location
-                timeout: 10000,           // 10 second timeout
-                maximumAge: 1000          // Accept cached location up to 1 second old
-            };
+            updateStatus("Getting your location...", "");
 
-            updateStatus("Starting navigation tracking...", "info");
-            
-            // Start watching position changes
-            watchId = navigator.geolocation.watchPosition(
-                handleLocationSuccess,
-                handleLocationError,
-                options
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    
+                    currentLocation = { lat, lng };
+                    
+                    // Create blue car icon for user location
+                    const carIcon = L.divIcon({
+                        html: `<div style="
+                            width: 30px; 
+                            height: 30px; 
+                            background: #2196f3; 
+                            border: 3px solid white; 
+                            border-radius: 50%; 
+                            display: flex; 
+                            align-items: center; 
+                            justify-content: center; 
+                            font-size: 16px; 
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                        ">🚗</div>`,
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 15]
+                    });
+
+                    // Remove existing user marker
+                    if (userMarker) {
+                        map.removeLayer(userMarker);
+                    }
+
+                    // Add user location marker
+                    userMarker = L.marker([lat, lng], { icon: carIcon }).addTo(map);
+                    userMarker.bindPopup('<b>📍 Your Location</b>').openPopup();
+                    
+                    map.setView([lat, lng], 15);
+                    updateStatus(`Location found: ${lat.toFixed(5)}, ${lng.toFixed(5)}`, "success");
+                },
+                function(error) {
+                    let message = "Location error: ";
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            message += "Permission denied";
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            message += "Position unavailable";
+                            break;
+                        case error.TIMEOUT:
+                            message += "Request timeout";
+                            break;
+                        default:
+                            message += "Unknown error";
+                            break;
+                    }
+                    updateStatus(message, "error");
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
             );
-            
-            // Update UI state
-            isTracking = true;
-            trackingBtn.textContent = "Stop Navigation";
-            trackingBtn.style.background = "#f44336";
         }
 
-        /**
-         * Stops GPS tracking and returns to route preview mode
-         */
-        function stopTracking() {
-            // Stop GPS watching
-            if (watchId !== null) {
-                navigator.geolocation.clearWatch(watchId);
-                watchId = null;
-            }
-            
-            // Reset navigation state
-            isTracking = false;
-            navigationStarted = false;
-            trackingBtn.textContent = "Start Navigation";
-            trackingBtn.style.background = "#007cba";
-            trackingBtn.style.display = 'none';
-            startRouteBtn.style.display = 'inline-block';
-            
-            // Show route preview message again
-            const routePreview = document.getElementById('routePreview');
-            if (routePreview) {
-                routePreview.style.display = 'block';
-            }
-            
-            // Hide current instruction during preview
-            document.getElementById('currentInstruction').style.display = 'none';
-            
-            updateStatus("Navigation stopped - Route preview mode", "info");
-        }
-
-        // ===== GPS LOCATION HANDLING =====
-
-        /**
-         * Handles successful GPS location updates
-         * Calculates speed, updates car position, and manages navigation
-         * @param {GeolocationPosition} position - GPS position object
-         */
-        async function handleLocationSuccess(position) {
-            try {
-                // Validate position data
-                if (!position || !position.coords) {
-                    throw new Error("Invalid position data received");
-                }
-
-                const { latitude: lat, longitude: lng, accuracy, heading } = position.coords;
-                
-                // Validate coordinate values
-                if (typeof lat !== 'number' || typeof lng !== 'number' || 
-                    isNaN(lat) || isNaN(lng) || 
-                    lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-                    throw new Error(`Invalid coordinates: lat=${lat}, lng=${lng}`);
-                }
-
-                updateStatus(`Location: ${lat.toFixed(6)}, ${lng.toFixed(6)} (±${accuracy?.toFixed(0)}m)`, "success");
-
-                // Calculate speed using previous position
-                if (lastPosition && lastPosition.timestamp) {
-                    const dist = haversine(lastPosition.lat, lastPosition.lng, lat, lng);
-                    const timeDiff = (position.timestamp - lastPosition.timestamp) / 1000; // seconds
-                    
-                    if (timeDiff > 0) {
-                        const speedMps = dist / timeDiff;           // meters per second
-                        const speedKmph = speedMps * 3.6;          // convert to km/h
-                        speedDisplay.textContent = `🚗 Speed: ${speedKmph.toFixed(2)} km/h`;
-                        
-                        // Update distance traveled for navigation progress
-                        distanceTraveled += dist;
-                    }
-                }
-
-                // Store current position for next speed calculation
-                lastPosition = {
-                    lat,
-                    lng,
-                    timestamp: position.timestamp
-                };
-
-                currentLocation = { lat, lng };
-
-                // Update car icon position and rotation
-                updateCarPosition(lat, lng, heading);
-
-                // Update navigation progress if route exists and navigation is active
-                if (routeCoordinates.length > 0 && navigationStarted) {
-                    updateNavigationProgress(lat, lng);
-                }
-
-                // Send location to backend (optional - for fleet management)
-                await sendLocationUpdate(lat, lng);
-
-            } catch (error) {
-                updateStatus(`Location processing error: ${error.message}`, "error");
-            }
-        }
-
-        /**
-         * Updates or creates the car icon on the map
-         * @param {number} lat - Latitude
-         * @param {number} lng - Longitude  
-         * @param {number} heading - Direction in degrees (optional)
-         */
-        function updateCarPosition(lat, lng, heading) {
-            if (carIcon) {
-                // Update existing car icon position
-                carIcon.setLatLng([lat, lng]);
-                
-                // Rotate car icon based on heading direction
-                if (heading !== undefined && heading !== null) {
-                    const carElement = carIcon.getElement();
-                    if (carElement) {
-                        const iconDiv = carElement.querySelector('div');
-                        if (iconDiv) {
-                            iconDiv.style.transform = `rotate(${heading}deg)`;
-                        }
-                    }
-                }
-            } else {
-                // Create new car icon
-                carIcon = L.marker([lat, lng], { icon: createCarIcon() }).addTo(map);
-                carIcon.bindPopup('<b>🚗 Your Vehicle</b>').openPopup();
-            }
-            
-            // Center map on car only during active navigation
-            if (isTracking && navigationStarted) {
-                map.setView([lat, lng], map.getZoom());
-            }
-        }
-
-        /**
-         * Updates navigation progress and instructions based on current location
-         * @param {number} currentLat - Current latitude
-         * @param {number} currentLng - Current longitude
-         */
-        function updateNavigationProgress(currentLat, currentLng) {
-            if (routeCoordinates.length === 0) return;
-
-            // Find closest point on the planned route
-            let closestIndex = 0;
-            let minDistance = Infinity;
-
-            for (let i = 0; i < routeCoordinates.length; i++) {
-                const [routeLat, routeLng] = routeCoordinates[i];
-                const distance = haversine(currentLat, currentLng, routeLat, routeLng);
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestIndex = i;
-                }
-            }
-
-            currentRouteIndex = closestIndex;
-
-            // Calculate remaining distance along the route
-            let remainingDistance = 0;
-            for (let i = closestIndex; i < routeCoordinates.length - 1; i++) {
-                const [lat1, lng1] = routeCoordinates[i];
-                const [lat2, lng2] = routeCoordinates[i + 1];
-                remainingDistance += haversine(lat1, lng1, lat2, lng2);
-            }
-
-            // Update navigation display
-            const remainingKm = (remainingDistance / 1000).toFixed(2);
-            const progress = ((totalRouteDistance - remainingDistance) / totalRouteDistance) * 100;
-            const estimatedTimeMin = (remainingDistance / 1000 / 50 * 60).toFixed(0); // Assuming 50km/h average speed
-
-            document.getElementById('remainingDistance').textContent = `${remainingKm} km left`;
-            document.getElementById('estimatedTime').textContent = `${estimatedTimeMin} min ETA`;
-            document.getElementById('progressFill').style.width = `${Math.max(0, Math.min(100, progress))}%`;
-
-            // Update current turn instruction
-            updateCurrentInstruction(currentLat, currentLng);
-        }
-
-        /**
-         * Updates the current turn-by-turn instruction display
-         * @param {number} currentLat - Current latitude
-         * @param {number} currentLng - Current longitude
-         */
-        function updateCurrentInstruction(currentLat, currentLng) {
-            if (routeInstructions.length === 0) return;
-
-            // Find next upcoming instruction
-            let nextInstruction = null;
-            for (let instruction of routeInstructions) {
-                const [instLat, instLng] = instruction.location;
-                const distanceToInstruction = haversine(currentLat, currentLng, instLat, instLng);
-                
-                // Only show instructions that are more than 5 meters away
-                if (distanceToInstruction > 5) {
-                    nextInstruction = {
-                        ...instruction,
-                        distance: distanceToInstruction
-                    };
-                    break;
-                }
-            }
-
-            if (nextInstruction) {
-                // Format distance display
-                const distanceText = nextInstruction.distance < 1000 
-                    ? `${Math.round(nextInstruction.distance)}m`
-                    : `${(nextInstruction.distance / 1000).toFixed(1)}km`;
-
-                // Update instruction display
-                document.getElementById('nextTurnIcon').textContent = getInstructionIcon(nextInstruction.maneuver);
-                document.getElementById('nextTurnText').textContent = nextInstruction.instruction;
-                document.getElementById('nextTurnDistance').textContent = `in ${distanceText}`;
-                document.getElementById('currentInstruction').style.display = 'block';
-                document.getElementById('routeInfoPanel').style.display = 'block';
-            }
-        }
-
-        /**
-         * Maps maneuver types to appropriate emoji icons
-         * @param {string} maneuver - OSRM maneuver type
-         * @returns {string} Emoji representing the maneuver
-         */
-        function getInstructionIcon(maneuver) {
-            // console.log(`Getting icon for maneuver: ${maneuver}`);
-            const icons = {
-                'turn-left': '↰',
-                'turn-right': '↱',
-                'turn-sharp-left': '↺',
-                'turn-sharp-right': '↻',
-                'turn-slight-left': '↖',
-                'turn-slight-right': '↗',
-                'straight': '↑',
-                'roundabout': '🔄',
-                'destination': '🏁',
-                'depart': '🚀'
-            };
-            return icons[maneuver] || '➡️';
-        }
-
-        /**
-         * Handles GPS location errors
-         * @param {GeolocationPositionError} error - GPS error object
-         */
-        function handleLocationError(error) {
-            let message = "Location error: ";
-            switch(error.code) {
-                case error.PERMISSION_DENIED:
-                    message += "Permission denied by user";
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    message += "Position unavailable";
-                    break;
-                case error.TIMEOUT:
-                    message += "Location request timed out";
-                    break;
-                default:
-                    message += error.message || "Unknown error";
-                    break;
-            }
-            updateStatus(message, "error");
-        }
-
-        // ===== BACKEND COMMUNICATION =====
-
-        /**
-         * Sends location update to backend server (optional feature)
-         * Used for fleet management and charging station recommendations
-         * @param {number} lat - Latitude
-         * @param {number} lng - Longitude
-         */
-        async function sendLocationUpdate(lat, lng) {
-            try {
-                const response = await fetch('http://localhost:8000/api/location/update', {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        lat,
-                        lng,
-                        batteryLevel,
-                        timestamp: Date.now()
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-
-                const data = await response.json();
-                
-                // Handle charging station recommendations for low battery
-                if (data.redirectToChargingStation && data.station) {
-                    const { lat: clat, lon: clon, name } = data.station;
-                    
-                    if (typeof clat === 'number' && typeof clon === 'number' && 
-                        !isNaN(clat) && !isNaN(clon)) {
-                        map.setView([clat, clon], 15);
-                        const marker = L.marker([clat, clon]).addTo(map);
-                        marker.bindPopup(`<b>🔋 Nearest Charging Station</b><br>${name}`).openPopup();
-                        markers.push(marker);
-                        updateStatus(`Redirected to charging station: ${name}`, "success");
-                    } else {
-                        updateStatus("Invalid charging station coordinates received", "error");
-                    }
-                }
-            } catch (error) {
-                // Backend communication is optional, so only warn if it fails
-                console.warn('Backend communication error:', error.message);
-            }
-        }
-
-        // ===== SEARCH AND SUGGESTIONS =====
-
-        /**
-         * Displays location search suggestions in dropdown
-         * @param {Array} locations - Array of location objects from Nominatim API
-         */
-        function showSearchSuggestions(locations) {
-            suggestionsList.innerHTML = '';
-            locations.forEach((loc, index) => {
-                const li = document.createElement('li');
-                li.style.padding = '8px';
-                li.style.cursor = 'pointer';
-                li.textContent = loc.display_name;
-                
-                // Add click handler for selection
-                li.addEventListener('click', () => {
-                    selectSuggestion(loc);
-                });
-                
-                // Add hover effects
-                li.addEventListener('mouseenter', () => {
-                    li.style.backgroundColor = '#f0f0f0';
-                });
-                li.addEventListener('mouseleave', () => {
-                    li.style.backgroundColor = 'white';
-                });
-                
-                suggestionsList.appendChild(li);
-            });
-            suggestionsList.style.display = 'block';
-        }
-
-        /**
-         * Clears the search suggestions dropdown
-         */
-        function clearSuggestions() {
-            suggestionsList.innerHTML = '';
-            suggestionsList.style.display = 'none';
-        }
-
-        /**
-         * Handles selection of a search suggestion
-         * Creates destination marker and calculates route
-         * @param {Object} location - Selected location object from Nominatim
-         */
-        function selectSuggestion(location) {
-            clearSuggestions();
-            document.getElementById('searchInput').value = location.display_name;
-            
-            const lat = parseFloat(location.lat);
-            const lng = parseFloat(location.lon);
-
-            // Validate coordinates
-            if (isNaN(lat) || isNaN(lng)) {
-                updateStatus("Invalid coordinates in selected suggestion", "error");
+        // Start navigation
+        function startNavigation() {
+            if (!routeLayer) {
+                updateStatus("Please load the route first", "error");
                 return;
             }
 
-            // Clear existing route and reset navigation state
+            if (isNavigating) {
+                // Stop navigation
+                isNavigating = false;
+                document.getElementById('routeStatus').textContent = 'Loaded';
+                document.getElementById('startNavBtn').textContent = '🚀 Start Navigation';
+                document.getElementById('startNavBtn').style.background = '#4caf50';
+                updateStatus("Navigation stopped.", "success");
+            } else {
+                // Start navigation
+                isNavigating = true;
+                document.getElementById('routeStatus').textContent = 'Navigating';
+                document.getElementById('startNavBtn').textContent = '🛑 Stop Navigation';
+                document.getElementById('startNavBtn').style.background = '#f44336';
+                updateStatus("Navigation started! Follow the dark orange route to Amity University.", "success");
+            }
+        }
+
+        // Clear route and markers
+        function clearRoute() {
             if (routeLayer) {
                 map.removeLayer(routeLayer);
                 routeLayer = null;
             }
-
-            // Remove existing destination marker
-            if (destinationMarker) {
-                map.removeLayer(destinationMarker);
+            if (startMarker) {
+                map.removeLayer(startMarker);
+                startMarker = null;
             }
-
-            // Reset navigation state to preview mode
-            navigationStarted = false;
-            startRouteBtn.style.display = 'none';
-            trackingBtn.style.display = 'none';
-
-            // Create destination marker
-            destinationMarker = L.marker([lat, lng], {
-                icon: L.icon({
-                    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                    popupAnchor: [1, -34],
-                    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                    shadowSize: [41, 41]
-                })
-            }).addTo(map);
-            destinationMarker.bindPopup(`<b>📍 ${location.display_name}</b>`).openPopup();
-
-            updateStatus(`Selected destination: ${location.display_name}`, "success");
-
-            // Calculate and draw route
-            if (currentLocation) {
-                drawRoute(currentLocation.lat, currentLocation.lng, lat, lng);
-            } else {
-                // Get current location first, then draw route
-                getCurrentLocation().then(() => {
-                    if (currentLocation) {
-                        drawRoute(currentLocation.lat, currentLocation.lng, lat, lng);
-                    }
-                });
+            if (endMarker) {
+                map.removeLayer(endMarker);
+                endMarker = null;
             }
-        }
-
-        // ===== ROUTE CALCULATION =====
-
-        /**
-         * Calculates and displays route using OSRM routing service
-         * @param {number} lat1 - Start latitude
-         * @param {number} lon1 - Start longitude
-         * @param {number} lat2 - End latitude  
-         * @param {number} lon2 - End longitude
-         */
-        async function drawRoute(lat1, lon1, lat2, lon2) {
-            updateStatus("Calculating optimized route with directions...", "info");
-
-            // OSRM API URL for route calculation with turn-by-turn instructions
-            const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson&steps=true`;
-
-            try {
-                const res = await fetch(osrmUrl);
-                if (!res.ok) {
-                    throw new Error(`Routing API error: ${res.status}`);
-                }
-
-                const data = await res.json();
-                if (data.code !== "Ok" || !data.routes || data.routes.length === 0) {
-                    throw new Error("No route found");
-                }
-
-                const route = data.routes[0];
-                
-                // Convert coordinates from [lng, lat] to [lat, lng] for Leaflet
-                const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-                routeCoordinates = coords;
-                totalRouteDistance = route.distance;
-                totalRouteDuration = route.duration;
-                distanceTraveled = 0;
-
-                // Remove existing route line
-                if (routeLayer) {
-                    map.removeLayer(routeLayer);
-                }
-
-                // Draw new route line with dashed style
-                routeLayer = L.polyline(coords, { 
-                    color: '#2196f3', 
-                    weight: 6, 
-                    opacity: 0.8,
-                    dashArray: '10, 5'  // Dashed line style
-                }).addTo(map);
-
-                // Fit map to show entire route
-                const bounds = L.latLngBounds([[lat1, lon1], [lat2, lon2]]);
-                map.fitBounds(bounds, { padding: [20, 20] });
-
-                // Process turn-by-turn directions
-                processRouteInstructions(route.legs[0].steps);
-
-                // Update route information display
-                const routeInfoPanel = document.getElementById('routeInfoPanel');
-                const remainingDistance = document.getElementById('remainingDistance');
-                const estimatedTime = document.getElementById('estimatedTime');
-                
-                remainingDistance.textContent = `${(route.distance/1000).toFixed(2)} km`;
-                estimatedTime.textContent = `${(route.duration/60).toFixed(0)} min`;
-                routeInfoPanel.style.display = 'block';
-
-                // Show start route button for beginning navigation
-                startRouteBtn.style.display = 'inline-block';
-                
-                // Show route preview message
-                const routePreview = document.getElementById('routePreview');
-                if (routePreview) {
-                    routePreview.style.display = 'block';
-                }
-
-                updateStatus(`Route preview ready: ${(route.distance/1000).toFixed(2)} km, ${(route.duration/60).toFixed(0)} min - Click "Start Route" to begin navigation`, "success");
-
-            } catch (error) {
-                updateStatus(`Error calculating route: ${error.message}`, "error");
-            }
-        }
-
-        /**
-         * Processes OSRM route steps into navigation instructions
-         * Updates the directions list with turn-by-turn instructions
-         * @param {Array} steps - Array of route steps from OSRM API
-         */
-        function processRouteInstructions(steps) {
-            routeInstructions = [];
-            const directionsList = document.getElementById('directionsList');
-            directionsList.innerHTML = '';
-
-            steps.forEach((step, index) => {
-                const instruction = {
-                    instruction: step.maneuver.instruction || `${step.maneuver.type.replace(/-/g, ' ')}`,
-                    maneuver: step.maneuver.type,
-                    location: [step.maneuver.location[1], step.maneuver.location[0]], // Convert to [lat, lng]
-                    distance: step.distance,
-                    duration: step.duration
-                };
-
-                routeInstructions.push(instruction);
-
-                // Create instruction display element
-                const instructionDiv = document.createElement('div');
-                instructionDiv.className = 'instruction-item';
-                instructionDiv.innerHTML = `
-                    <span class="instruction-icon">${getInstructionIcon(instruction.maneuver)}</span>
-                    <span class="instruction-text">${instruction.instruction}</span>
-                    <span class="instruction-distance">${(instruction.distance/1000).toFixed(2)} km</span>
-                `;
-                directionsList.appendChild(instructionDiv);
-                console.log("instruction:", instruction);
-            });
-
-            // Add final destination instruction
-            const finalInstruction = document.createElement('div');
-            finalInstruction.className = 'instruction-item';
-            finalInstruction.innerHTML = `
-                <span class="instruction-icon">🏁</span>
-                <span class="instruction-text"><strong>Arrive at destination</strong></span>
-                <span class="instruction-distance">0 km</span>
-            `;
-            directionsList.appendChild(finalInstruction);
-        }
-
-        // ===== USER ACTIONS =====
-
-        /**
-         * Searches for locations using Nominatim geocoding API
-         * Shows suggestions dropdown for user selection
-         */
-        async function searchLocation() {
-            const query = document.getElementById('searchInput').value.trim();
-            if (!query) {
-                updateStatus("Please enter a search query", "error");
-                return;
-            }
-
-            // Ensure current location is available for route calculation
-            if (!currentLocation) {
-                if (!navigator.geolocation) {
-                    updateStatus("Geolocation not supported", "error");
-                    return;
-                }
-                updateStatus("Requesting current location permission...", "info");
-                try {
-                    const position = await new Promise((resolve, reject) => {
-                        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
-                    });
-                    currentLocation = {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    };
-                    updateCarPosition(currentLocation.lat, currentLocation.lng);
-                    updateStatus(`Current location obtained: ${currentLocation.lat.toFixed(6)}, ${currentLocation.lng.toFixed(6)}`, "success");
-                } catch (error) {
-                    updateStatus("Permission denied or error obtaining location", "error");
-                    return;
-                }
-            }
-
-            try {
-                updateStatus("Searching for location...", "info");
-
-                // Search within India's bounding box for better results
-                const indiaViewbox = "68.1114,35.6745,97.3956,6.5546";
-                const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=${indiaViewbox}&bounded=1&limit=5&addressdetails=1`;
-
-                const response = await fetch(url);
-
-                if (!response.ok) {
-                    throw new Error(`Search failed: ${response.status}`);
-                }
-
-                const data = await response.json();
-
-                if (data.length === 0) {
-                    updateStatus('Location not found within India!', "error");
-                    return;
-                }
-
-                // Show search suggestions dropdown
-                showSearchSuggestions(data);
-
-            } catch (error) {
-                updateStatus(`Search error: ${error.message}`, "error");
-            }
-        }
-
-        /**
-         * Adds a marker at the current map center
-         */
-        function addMarker() {
-            try {
-                const center = map.getCenter();
-                const marker = L.marker([center.lat, center.lng]).addTo(map);
-                marker.bindPopup(`<b>Manual Marker</b><br>Lat: ${center.lat.toFixed(5)}<br>Lng: ${center.lng.toFixed(5)}`);
-                markers.push(marker);
-                updateStatus("Marker added at map center", "success");
-            } catch (error) {
-                updateStatus(`Error adding marker: ${error.message}`, "error");
-            }
-        }
-
-        /**
-         * Clears all markers, routes, and resets navigation state
-         */
-        function clearMarkers() {
-            try {
-                // Remove all user-placed markers
-                markers.forEach(marker => {
-                    map.removeLayer(marker);
-                });
-                markers = [];
-                
-                // Clear route visualization
-                if (routeLayer) {
-                    map.removeLayer(routeLayer);
-                    routeLayer = null;
-                }
-
-                // Remove destination marker
-                if (destinationMarker) {
-                    map.removeLayer(destinationMarker);
-                    destinationMarker = null;
-                }
-                
-                // Reset all navigation data
-                routeCoordinates = [];
-                routeInstructions = [];
-                currentRouteIndex = 0;
-                distanceTraveled = 0;
-                navigationStarted = false;
-                
-                // Hide navigation UI elements
-                document.getElementById('routeInfoPanel').style.display = 'none';
-                document.getElementById('currentInstruction').style.display = 'none';
-                startRouteBtn.style.display = 'none';
-                trackingBtn.style.display = 'none';
-                document.getElementById('directionsList').innerHTML = 'Search for a destination to see turn-by-turn directions';
-                
-                // Stop any active GPS tracking
-                if (isTracking) {
-                    stopTracking();
-                }
-                
-                updateStatus(`Cleared all markers and route`, "success");
-            } catch (error) {
-                updateStatus(`Error clearing markers: ${error.message}`, "error");
-            }
-        }
-
-        /**
- * Promisified function to get user's current GPS location
- * Returns a Promise that resolves with location coordinates or rejects with error
- * @returns {Promise<Object>} Promise resolving to {lat, lng} coordinates
- */
-function getCurrentLocation() {
-    return new Promise((resolve, reject) => {
-        // Check if browser supports geolocation API
-        if (!navigator.geolocation) {
-            updateStatus('Geolocation is not supported by this browser', "error");
-            reject(new Error('Geolocation not supported'));
-            return;
-        }
-
-        updateStatus("Getting current location...", "info");
-
-        // Request current position with high accuracy
-        navigator.geolocation.getCurrentPosition(
-            // Success callback - called when location is obtained
-            function(position) {
-                try {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-
-                    // Validate that coordinates are valid numbers
-                    if (isNaN(lat) || isNaN(lng)) {
-                        throw new Error("Invalid coordinates received");
-                    }
-
-                    // Store location globally for use in other functions
-                    currentLocation = { lat, lng };
-                    
-                    // Update car icon position on map
-                    updateCarPosition(lat, lng);
-
-                    // Center map on user's location with zoom level 15
-                    map.setView([lat, lng], 15);
-
-                    updateStatus(`Current location: ${lat.toFixed(6)}, ${lng.toFixed(6)}`, "success");
-                    
-                    // Resolve promise with location data
-                    resolve(currentLocation);
-                } catch (error) {
-                    updateStatus(`Error processing location: ${error.message}`, "error");
-                    reject(error);
-                }
-            },
-            // Error callback - called when location request fails
-            function(error) {
-                handleLocationError(error);
-                reject(error);
-            },
-            // Options for location request
-            { 
-                enableHighAccuracy: true, // Use GPS instead of network location
-                timeout: 10000           // 10 second timeout
-            }
-        );
-    });
-}
-
-// ===== EVENT LISTENERS FOR USER INTERFACE =====
-
-/**
- * Click outside search area to close suggestions dropdown
- * Improves user experience by hiding suggestions when clicking elsewhere
- */
-document.addEventListener('click', function(e) {
-    // Check if click was outside both search input and suggestions list
-    if (!e.target.closest('#searchInput') && !e.target.closest('#suggestions')) {
-        clearSuggestions();
-    }
-});
-
-/**
- * Allow Enter key to trigger search from input field
- * Provides keyboard shortcut for better accessibility
- */
-document.getElementById('searchInput').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        searchLocation();
-    }
-});
-
-/**
- * Real-time search suggestions as user types
- * Provides autocomplete functionality with debouncing to avoid excessive API calls
- */
-document.getElementById('searchInput').addEventListener('input', function(e) {
-    const query = e.target.value.trim();
-    
-    // Only search if query is longer than 2 characters
-    if (query.length > 2) {
-        // Clear any existing timeout to debounce rapid typing
-        clearTimeout(this.searchTimeout);
-        
-        // Wait 500ms after user stops typing before searching
-        this.searchTimeout = setTimeout(() => {
-            searchForSuggestions(query);
-        }, 500);
-    } else {
-        // Clear suggestions if query too short
-        clearSuggestions();
-    }
-});
-
-/**
- * Searches for location suggestions in real-time as user types
- * Uses Nominatim API with India bounding box for relevant results
- * @param {string} query - Search query string
- */
-async function searchForSuggestions(query) {
-    try {
-        // Bounding box coordinates for India to limit search results
-        const indiaViewbox = "68.1114,35.6745,97.3956,6.5546";
-        
-        // Construct Nominatim API URL with India bounds and 5 result limit
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=${indiaViewbox}&bounded=1&limit=5&addressdetails=1`;
-
-        const response = await fetch(url);
-        
-        // Only process successful responses
-        if (response.ok) {
-            const data = await response.json();
             
-            // Show suggestions if any results found
-            if (data.length > 0) {
-                showSearchSuggestions(data);
-            }
+            document.getElementById('routeStatus').textContent = 'Ready';
+            document.getElementById('startNavBtn').style.display = 'none';
+            document.getElementById('startNavBtn').textContent = '🚀 Start Navigation';
+            document.getElementById('startNavBtn').style.background = '#4caf50';
+            isNavigating = false;
+            
+            updateStatus("Route cleared", "success");
         }
-    } catch (error) {
-        // Log error but don't show to user as this is background functionality
-        console.warn('Suggestion search error:', error);
-    }
-}
 
-// ===== INITIALIZATION CODE =====
+        // Update status display
+        function updateStatus(message, type = "") {
+            const statusElement = document.getElementById('statusDisplay');
+            const timestamp = new Date().toLocaleTimeString();
+            statusElement.textContent = `[${timestamp}] ${message}`;
+            statusElement.className = `status ${type}`;
+        }
 
-/**
- * Initialize battery display with current level on page load
- * Sets initial battery percentage display
- */
-batteryDisplay.textContent = `🔋 Battery: ${batteryLevel}%`;
+        // Load Leaflet library dynamically and then initialize
+        function loadLeaflet() {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
+            script.onload = function() {
+                // Initialize map after Leaflet loads
+                initMap();
+                loadDelhiToAmityRoute();
+            };
+            script.onerror = function() {
+                updateStatus("Failed to load map library", "error");
+            };
+            document.head.appendChild(script);
+        }
 
-/**
- * Auto-start location tracking when page loads
- * Attempts to get user location automatically for better user experience
- * Uses setTimeout to ensure map is fully initialized first
- */
-window.addEventListener('load', function() {
-    // Wait 1 second for map initialization to complete
-    setTimeout(() => {
-        // Attempt to get current location
-        getCurrentLocation().then(() => {
-            // Success - user granted location permission
-            updateStatus("Ready for navigation! Search for a destination to begin.", "success");
-        }).catch(() => {
-            // Failed - likely permission denied or geolocation unavailable
-            updateStatus("Click 'My Location' to enable navigation features.", "info");
-        });
-    }, 1000);
-});
-
+        // Initialize when page loads
+        window.onload = function() {
+            updateStatus("Loading map library...", "");
+            loadLeaflet();
+        };
     </script>
 </body>
 </html>
